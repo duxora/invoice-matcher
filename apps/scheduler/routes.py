@@ -399,6 +399,102 @@ async def create_task(
     return RedirectResponse(url=f"/scheduler/tasks/{slug}", status_code=303)
 
 
+@router.post("/api/update-prompt/{slug}")
+async def update_prompt(slug: str, prompt: str = Form(...)):
+    """Update the prompt in a .task file."""
+    import re
+    task, err = _find_task_by_slug(slug)
+    if err:
+        return RedirectResponse(url="/scheduler/", status_code=303)
+
+    content = task.file_path.read_text()
+    # Replace everything after --- with the new prompt
+    parts = content.split("---", 1)
+    if len(parts) == 2:
+        new_content = parts[0] + "---\n" + prompt.strip() + "\n"
+    else:
+        new_content = content + "\n---\n" + prompt.strip() + "\n"
+    task.file_path.write_text(new_content)
+    return RedirectResponse(url=f"/scheduler/tasks/{slug}", status_code=303)
+
+
+@router.post("/api/generate-prompt", response_class=HTMLResponse)
+async def generate_prompt(
+    description: str = Form(...),
+    workdir: str = Form(default=""),
+):
+    """Use Claude to generate a structured task prompt from a short description."""
+    import subprocess as sp
+
+    system = (
+        "You are a prompt engineer for Claude Code automated tasks. "
+        "Given a short description, write a clear, detailed prompt that Claude will execute as a scheduled task. "
+        "The prompt should be specific, actionable, and include what to check, what to output, and how to handle edge cases. "
+        "Output ONLY the prompt text, no explanation or markdown fencing."
+    )
+    user_msg = f"Task description: {description}"
+    if workdir:
+        user_msg += f"\nWorking directory: {workdir}"
+
+    try:
+        result = sp.run(
+            ["claude", "-p", user_msg, "--output-format", "text"],
+            capture_output=True, text=True, timeout=60,
+            env={**__import__("os").environ, "CLAUDE_SYSTEM_PROMPT": system},
+        )
+        if result.returncode == 0 and result.stdout.strip():
+            prompt = result.stdout.strip()
+        else:
+            prompt = f"# Failed to generate. Error: {result.stderr[:200]}\n# Please write your prompt manually."
+    except Exception as e:
+        prompt = f"# Generation failed: {e}\n# Please write your prompt manually."
+
+    # Return just the textarea content for HTMX swap
+    return HTMLResponse(
+        f'<textarea name="prompt" rows="12" '
+        f'class="w-full bg-hub-bg border border-hub-border rounded px-3 py-2 text-sm font-mono '
+        f'focus:border-hub-accent focus:outline-none text-hub-text">{prompt}</textarea>'
+    )
+
+
+@router.post("/api/improve-prompt", response_class=HTMLResponse)
+async def improve_prompt(
+    prompt: str = Form(...),
+    feedback: str = Form(default=""),
+):
+    """Use Claude to improve an existing task prompt."""
+    import subprocess as sp
+
+    system = (
+        "You are a prompt engineer for Claude Code automated tasks. "
+        "Improve the given prompt to be clearer, more specific, and more robust. "
+        "Keep the same intent but make it better structured with clear steps and edge case handling. "
+        "Output ONLY the improved prompt text, no explanation or markdown fencing."
+    )
+    user_msg = f"Current prompt:\n{prompt}"
+    if feedback:
+        user_msg += f"\n\nUser feedback: {feedback}"
+
+    try:
+        result = sp.run(
+            ["claude", "-p", user_msg, "--output-format", "text"],
+            capture_output=True, text=True, timeout=60,
+            env={**__import__("os").environ, "CLAUDE_SYSTEM_PROMPT": system},
+        )
+        if result.returncode == 0 and result.stdout.strip():
+            improved = result.stdout.strip()
+        else:
+            improved = prompt  # Keep original on failure
+    except Exception:
+        improved = prompt
+
+    return HTMLResponse(
+        f'<textarea name="prompt" rows="12" '
+        f'class="w-full bg-hub-bg border border-hub-border rounded px-3 py-2 text-sm font-mono '
+        f'focus:border-hub-accent focus:outline-none text-hub-text">{improved}</textarea>'
+    )
+
+
 @router.post("/api/approvals/{approval_id}/approve")
 async def approve(approval_id: int):
     db = get_db()
