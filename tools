@@ -71,11 +71,11 @@ def main():
     sub = parser.add_subparsers(dest="command", required=True)
 
     p = sub.add_parser("serve", help="Start web server")
-    p.add_argument("--port", "-p", type=int, default=7000)
+    p.add_argument("--port", "-p", type=int, default=7070)
     p.set_defaults(func=cmd_serve)
 
     p = sub.add_parser("install", help="Install as launchd service")
-    p.add_argument("--port", "-p", type=int, default=7000)
+    p.add_argument("--port", "-p", type=int, default=7070)
     p.set_defaults(func=cmd_install)
 
     p = sub.add_parser("uninstall", help="Remove launchd service")
