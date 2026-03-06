@@ -5,3 +5,6 @@ __pycache__/
 data/
 logs/
 *.egg-info/
+dist/
+build/
+.eggs/
