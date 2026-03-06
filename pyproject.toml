@@ -1,0 +1,27 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "claude-scheduler"
+version = "1.0.0"
+description = "Scheduled AI tasks for Claude Code"
+license = "MIT"
+requires-python = ">=3.10"
+dependencies = [
+    "fastapi>=0.115.0",
+    "uvicorn[standard]>=0.30.0",
+    "jinja2>=3.1.0",
+    "rich>=13.0.0",
+    "textual>=0.50.0",
+]
+
+[project.optional-dependencies]
+dev = ["pytest>=8.0.0", "httpx>=0.27.0"]
+
+[project.scripts]
+cs = "claude_scheduler.cli:main"
+claude-scheduler = "claude_scheduler.cli:main"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/claude_scheduler"]

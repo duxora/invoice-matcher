@@ -1,0 +1,28 @@
+{% extends "base.html" %}
+
+{% block title %}Tools Hub — Home{% endblock %}
+
+{% block content %}
+<div class="max-w-5xl">
+  <h1 class="text-2xl font-bold mb-6">Welcome to Tools Hub</h1>
+
+  {% if apps %}
+  <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+    {% for app in apps %}
+    <a href="{{ app.prefix }}"
+       class="block bg-hub-card border border-hub-border rounded-lg p-5 hover:border-hub-accent/50 hover:bg-hub-accent/5 transition-all group">
+      <div class="text-3xl mb-3">{{ app.icon }}</div>
+      <h2 class="text-lg font-semibold text-hub-text group-hover:text-hub-accent transition-colors">
+        {{ app.name }}
+      </h2>
+      <p class="text-sm text-hub-muted mt-1">{{ app.description }}</p>
+    </a>
+    {% endfor %}
+  </div>
+  {% else %}
+  <div class="bg-hub-card border border-hub-border rounded-lg p-8 text-center">
+    <p class="text-hub-muted">No apps installed yet.</p>
+  </div>
+  {% endif %}
+</div>
+{% endblock %}

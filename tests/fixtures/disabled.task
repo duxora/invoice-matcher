@@ -1,0 +1,5 @@
+# name: Disabled Task
+# schedule: daily 09:00
+# enabled: false
+---
+This task is disabled.
