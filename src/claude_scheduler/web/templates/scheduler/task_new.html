@@ -52,6 +52,15 @@
 
 <!-- Full Form -->
 <div class="bg-hub-card border border-hub-border rounded-lg p-6 max-w-2xl">
+  {% if errors %}
+  <div class="bg-red-900/30 border border-red-500/50 rounded-lg p-4 mb-4">
+    <ul class="text-red-400 text-sm space-y-1">
+      {% for err in errors %}
+      <li>{{ err }}</li>
+      {% endfor %}
+    </ul>
+  </div>
+  {% endif %}
   <form method="post" action="/scheduler/tasks-new" class="space-y-4" id="task-form">
     <div class="grid grid-cols-2 gap-4">
       <div>

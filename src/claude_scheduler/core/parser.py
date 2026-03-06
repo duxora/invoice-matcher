@@ -4,6 +4,16 @@ from pathlib import Path
 from .models import Task, DEFAULTS
 from claude_scheduler.console import console
 
+VALID_SCHEDULES = [
+    r'^daily \d{2}:\d{2}$',
+    r'^weekly \w+ \d{2}:\d{2}$',
+    r'^every \d+[hm]$',
+]
+
+def validate_schedule(schedule: str) -> bool:
+    """Check if schedule string matches a known format."""
+    return any(re.match(p, schedule) for p in VALID_SCHEDULES)
+
 INT_FIELDS = {"max_turns", "timeout", "retry", "retry_delay", "remediation_max_turns"}
 BOOL_FIELDS = {"enabled", "write_requires_approval", "auto_pr"}
 FLOAT_FIELDS = {"budget_usd"}
@@ -34,6 +44,10 @@ def parse_task(path: Path) -> Task:
 
     kwargs = {"name": fields.pop("name"), "schedule": fields.pop("schedule"),
               "prompt": prompt, "file_path": path}
+
+    if not validate_schedule(kwargs["schedule"]):
+        console.print(f"[yellow]Warning: unrecognized schedule format '{kwargs['schedule']}' in {path}[/yellow]")
+
     for key, val in fields.items():
         if key in INT_FIELDS:
             kwargs[key] = int(val)

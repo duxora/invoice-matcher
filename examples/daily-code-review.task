@@ -1,0 +1,24 @@
+# name: Daily Code Review
+# schedule: daily 09:00
+# workdir: ~/workspace/myproject
+# model: claude-sonnet-4-6
+# tools: Read,Grep,Glob,Bash
+# max_turns: 15
+# timeout: 600
+# retry: 1
+# notify: errors
+# on_failure: investigate
+# enabled: false
+---
+Review all git commits from the last 24 hours in this repository.
+
+For each commit:
+1. Read the changed files using `git diff HEAD~1`
+2. Check for security issues (hardcoded secrets, SQL injection, XSS)
+3. Check for code quality (error handling, naming, complexity)
+4. Check for missing tests
+
+Output a markdown summary with:
+- Total commits reviewed
+- Issues found (critical/warning/info)
+- Recommendations
