@@ -7,14 +7,9 @@ from fastapi import APIRouter, Form, Query, Request
 from fastapi.responses import HTMLResponse, RedirectResponse
 from fastapi.templating import Jinja2Templates
 
+from claude_scheduler.config import get_config
 from claude_scheduler.core.db import Database
 from claude_scheduler.core.parser import find_tasks, parse_task
-
-# Temporary hardcoded paths — will be replaced by config.py in Task 2
-_HOME = Path.home()
-TASKS_DIR = _HOME / ".config" / "claude-scheduler" / "tasks"
-LOGS_DIR = _HOME / ".config" / "claude-scheduler" / "logs"
-DATA_DIR = _HOME / ".config" / "claude-scheduler" / "data"
 
 router = APIRouter()
 _TEMPLATES_DIR = Path(__file__).parent / "templates"
@@ -32,8 +27,9 @@ templates.env.loader = _loader
 # ---------------------------------------------------------------------------
 
 def get_db() -> Database:
-    DATA_DIR.mkdir(parents=True, exist_ok=True)
-    return Database(DATA_DIR / "scheduler.db")
+    cfg = get_config()
+    cfg.paths.data_dir.mkdir(parents=True, exist_ok=True)
+    return Database(cfg.paths.data_dir / "scheduler.db")
 
 
 def app_context(request: Request, **kwargs):
@@ -48,7 +44,7 @@ def _slug(name: str) -> str:
 
 def _find_task_by_slug(slug: str):
     """Return (Task, error_string) — one of them is always None."""
-    tasks = find_tasks(TASKS_DIR)
+    tasks = find_tasks(get_config().paths.tasks_dir)
     for t in tasks:
         if t.slug == slug:
             return t, None
@@ -63,7 +59,7 @@ def _find_task_by_slug(slug: str):
 async def dashboard(request: Request):
     db = get_db()
     try:
-        tasks = find_tasks(TASKS_DIR)
+        tasks = find_tasks(get_config().paths.tasks_dir)
         states = db.get_all_task_states()
         states_map = {s["task_name"]: s for s in states}
         runs = db.get_run_history(limit=100)
@@ -89,7 +85,7 @@ async def status_table_partial(request: Request):
     """HTMX partial — returns just the task status table rows for live refresh."""
     db = get_db()
     try:
-        tasks = find_tasks(TASKS_DIR)
+        tasks = find_tasks(get_config().paths.tasks_dir)
         states = db.get_all_task_states()
         states_map = {s["task_name"]: s for s in states}
         return templates.TemplateResponse("scheduler/partials/status_table.html", app_context(
@@ -179,11 +175,11 @@ async def doctor(request: Request):
         checks.append({"name": "Claude CLI", "ok": False, "detail": str(e)})
 
     # 2. Task count
-    tasks = find_tasks(TASKS_DIR)
+    tasks = find_tasks(get_config().paths.tasks_dir)
     checks.append({
         "name": "Task files",
         "ok": len(tasks) > 0,
-        "detail": f"{len(tasks)} task(s) found in {TASKS_DIR}",
+        "detail": f"{len(tasks)} task(s) found in {get_config().paths.tasks_dir}",
     })
 
     # 3. Stale runs
@@ -252,8 +248,9 @@ async def view_log(request: Request, slug: str):
     # Find most recent log file matching the task slug
     log_content = ""
     log_file = None
-    if LOGS_DIR.exists():
-        candidates = sorted(LOGS_DIR.glob(f"{slug}*"), key=lambda p: p.stat().st_mtime, reverse=True)
+    logs_dir = get_config().paths.logs_dir
+    if logs_dir.exists():
+        candidates = sorted(logs_dir.glob(f"{slug}*"), key=lambda p: p.stat().st_mtime, reverse=True)
         if candidates:
             log_file = candidates[0]
             raw = log_file.read_text(errors="replace")
@@ -298,7 +295,8 @@ async def run_task(slug: str):
     db = get_db()
     try:
         from claude_scheduler.core.orchestrator import Orchestrator
-        orch = Orchestrator(tasks_dir=TASKS_DIR, logs_dir=LOGS_DIR, db=db)
+        cfg = get_config()
+        orch = Orchestrator(tasks_dir=cfg.paths.tasks_dir, logs_dir=cfg.paths.logs_dir, db=db)
         orch.run_single(task)
         state = db.get_task_state(task.name)
         status = state["last_status"] if state else "unknown"
@@ -372,9 +370,24 @@ async def create_task(
     workdir: str = Form(default=""),
     enabled: bool = Form(default=True),
 ):
-    TASKS_DIR.mkdir(parents=True, exist_ok=True)
+    errors = []
+    if not name or not name.strip():
+        errors.append("Task name is required")
+    if not schedule or not schedule.strip():
+        errors.append("Schedule is required")
+    if not prompt or not prompt.strip():
+        errors.append("Prompt is required")
+    if errors:
+        return templates.TemplateResponse("scheduler/task_new.html", app_context(
+            request, errors=errors, form_data={"name": name, "schedule": schedule, "prompt": prompt,
+                "model": model, "max_turns": max_turns, "timeout": timeout, "tools": tools,
+                "workdir": workdir, "enabled": enabled}
+        ))
+
+    tasks_dir = get_config().paths.tasks_dir
+    tasks_dir.mkdir(parents=True, exist_ok=True)
     slug = _slug(name)
-    task_path = TASKS_DIR / f"{slug}.task"
+    task_path = tasks_dir / f"{slug}.task"
 
     lines = [
         f"# name: {name}",
