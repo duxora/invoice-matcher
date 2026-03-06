@@ -16,7 +16,16 @@ from scheduler.db import Database
 from scheduler.parser import find_tasks, parse_task
 
 router = APIRouter()
-templates = Jinja2Templates(directory=str(Path(__file__).parent / "templates"))
+SERVER_TEMPLATES = Path(__file__).parent.parent.parent / "server" / "templates"
+APP_TEMPLATES = Path(__file__).parent / "templates"
+
+from jinja2 import ChoiceLoader, FileSystemLoader
+_loader = ChoiceLoader([
+    FileSystemLoader(str(APP_TEMPLATES)),
+    FileSystemLoader(str(SERVER_TEMPLATES)),
+])
+templates = Jinja2Templates(directory=str(APP_TEMPLATES))
+templates.env.loader = _loader
 
 # ---------------------------------------------------------------------------
 # Helpers
