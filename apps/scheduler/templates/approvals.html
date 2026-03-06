@@ -1,0 +1,48 @@
+{% extends "base.html" %}
+{% block title %}Pending Approvals - Scheduler{% endblock %}
+
+{% block content %}
+<div class="mb-6">
+  <h1 class="text-2xl font-bold">Pending Approvals</h1>
+</div>
+
+<div class="bg-hub-card border border-hub-border rounded-lg overflow-hidden">
+  <table class="w-full text-sm">
+    <thead>
+      <tr class="border-b border-hub-border text-hub-muted text-left">
+        <th class="px-4 py-3">ID</th>
+        <th class="px-4 py-3">Task</th>
+        <th class="px-4 py-3">Artifact</th>
+        <th class="px-4 py-3">Created</th>
+        <th class="px-4 py-3">Actions</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for item in approvals %}
+      <tr class="border-b border-hub-border hover:bg-hub-bg/50">
+        <td class="px-4 py-3 text-hub-muted">{{ item.id }}</td>
+        <td class="px-4 py-3">{{ item.task_name }}</td>
+        <td class="px-4 py-3 text-hub-muted font-mono text-xs">{{ item.artifact_id }}</td>
+        <td class="px-4 py-3 text-hub-muted">{{ item.created_at }}</td>
+        <td class="px-4 py-3">
+          <div class="flex items-center gap-2">
+            <button hx-post="/scheduler/api/approvals/{{ item.id }}/approve"
+                    class="px-3 py-1 text-xs rounded bg-green-600 hover:bg-green-700 text-white transition-colors">
+              Approve
+            </button>
+            <button hx-post="/scheduler/api/approvals/{{ item.id }}/reject"
+                    class="px-3 py-1 text-xs rounded bg-red-600 hover:bg-red-700 text-white transition-colors">
+              Reject
+            </button>
+          </div>
+        </td>
+      </tr>
+      {% else %}
+      <tr>
+        <td colspan="5" class="px-4 py-8 text-center text-hub-muted">No pending approvals.</td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+{% endblock %}

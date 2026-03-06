@@ -1,0 +1,49 @@
+{% extends "base.html" %}
+
+{% block title %}Scheduler Dashboard{% endblock %}
+
+{% block content %}
+<!-- Header -->
+<div class="flex items-center justify-between mb-6">
+  <h1 class="text-2xl font-bold">📋 Scheduler Dashboard</h1>
+  <a href="/scheduler/tasks-new" class="btn btn-primary">+ New Task</a>
+</div>
+
+<!-- Stats Row -->
+<div class="grid grid-cols-2 md:grid-cols-5 gap-4 mb-6">
+  <div class="bg-hub-card border border-hub-border rounded-lg p-4">
+    <div class="text-hub-muted text-xs uppercase tracking-wide mb-1">Total Tasks</div>
+    <div class="text-2xl font-bold">{{ stats.total_tasks }}</div>
+  </div>
+  <div class="bg-hub-card border border-hub-border rounded-lg p-4">
+    <div class="text-hub-muted text-xs uppercase tracking-wide mb-1">Enabled</div>
+    <div class="text-2xl font-bold text-green-400">{{ stats.enabled }}</div>
+  </div>
+  <div class="bg-hub-card border border-hub-border rounded-lg p-4">
+    <div class="text-hub-muted text-xs uppercase tracking-wide mb-1">Failures</div>
+    <div class="text-2xl font-bold text-red-400">{{ stats.failures }}</div>
+  </div>
+  <div class="bg-hub-card border border-hub-border rounded-lg p-4">
+    <div class="text-hub-muted text-xs uppercase tracking-wide mb-1">Disabled</div>
+    <div class="text-2xl font-bold text-gray-400">{{ stats.disabled }}</div>
+  </div>
+  <div class="bg-hub-card border border-hub-border rounded-lg p-4">
+    <div class="text-hub-muted text-xs uppercase tracking-wide mb-1">Cost (runs)</div>
+    <div class="text-2xl font-bold text-yellow-400">${{ "%.2f" | format(stats.total_cost) }}</div>
+  </div>
+</div>
+
+<!-- Task Status Table -->
+<div class="bg-hub-card border border-hub-border rounded-lg">
+  <div class="flex items-center justify-between px-4 py-3 border-b border-hub-border">
+    <h2 class="text-lg font-semibold">Tasks</h2>
+    <span class="htmx-indicator text-hub-muted text-sm">Refreshing...</span>
+  </div>
+  <div class="p-4"
+       hx-get="/scheduler/partials/status-table"
+       hx-trigger="every 10s"
+       hx-swap="innerHTML">
+    {% include "partials/status_table.html" %}
+  </div>
+</div>
+{% endblock %}

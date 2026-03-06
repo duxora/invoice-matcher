@@ -1,0 +1,23 @@
+{% extends "base.html" %}
+{% block title %}Logs: {{ task.slug }} - Scheduler{% endblock %}
+
+{% block content %}
+<div class="mb-2">
+  <a href="/scheduler/tasks/{{ task.slug }}" class="text-hub-accent text-sm hover:underline">&larr; Back to {{ task.name }}</a>
+</div>
+
+<div class="mb-6">
+  <h1 class="text-2xl font-bold">Logs: {{ task.slug }}</h1>
+  {% if log_file %}
+  <p class="text-hub-muted text-xs mt-1 font-mono">{{ log_file }}</p>
+  {% endif %}
+</div>
+
+<div class="bg-hub-card border border-hub-border rounded-lg p-4">
+  {% if log_content %}
+  <pre class="text-sm text-hub-muted whitespace-pre-wrap font-mono max-h-[70vh] overflow-y-auto">{{ log_content }}</pre>
+  {% else %}
+  <p class="text-hub-muted text-center py-8">No log content found for this task.</p>
+  {% endif %}
+</div>
+{% endblock %}

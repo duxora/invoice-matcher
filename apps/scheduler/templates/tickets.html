@@ -1,0 +1,57 @@
+{% extends "base.html" %}
+{% block title %}Remediation Tickets - Scheduler{% endblock %}
+
+{% block content %}
+<div class="mb-6">
+  <h1 class="text-2xl font-bold">Remediation Tickets</h1>
+  {% if filter_status %}
+  <p class="text-hub-muted text-sm mt-1">Filtered by status: <span class="text-hub-accent">{{ filter_status }}</span></p>
+  {% endif %}
+</div>
+
+<div class="bg-hub-card border border-hub-border rounded-lg overflow-hidden">
+  <table class="w-full text-sm">
+    <thead>
+      <tr class="border-b border-hub-border text-hub-muted text-left">
+        <th class="px-4 py-3">ID</th>
+        <th class="px-4 py-3">Task</th>
+        <th class="px-4 py-3">Status</th>
+        <th class="px-4 py-3">Created</th>
+        <th class="px-4 py-3">Actions</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for ticket in tickets %}
+      <tr class="border-b border-hub-border hover:bg-hub-bg/50">
+        <td class="px-4 py-3 text-hub-muted">{{ ticket.id }}</td>
+        <td class="px-4 py-3">{{ ticket.task_name }}</td>
+        <td class="px-4 py-3">
+          {% if ticket.status == 'open' %}
+          <span class="px-2 py-0.5 rounded text-xs font-medium bg-yellow-900/40 text-yellow-400">open</span>
+          {% elif ticket.status == 'resolved' %}
+          <span class="px-2 py-0.5 rounded text-xs font-medium bg-green-900/40 text-green-400">resolved</span>
+          {% else %}
+          <span class="px-2 py-0.5 rounded text-xs font-medium bg-gray-900/40 text-gray-400">{{ ticket.status }}</span>
+          {% endif %}
+        </td>
+        <td class="px-4 py-3 text-hub-muted">{{ ticket.created_at }}</td>
+        <td class="px-4 py-3">
+          {% if ticket.status == 'open' %}
+          <button hx-post="/scheduler/api/tickets/{{ ticket.id }}/approve"
+                  class="px-3 py-1 text-xs rounded bg-green-600 hover:bg-green-700 text-white transition-colors">
+            Resolve
+          </button>
+          {% else %}
+          <span class="text-hub-muted text-xs">-</span>
+          {% endif %}
+        </td>
+      </tr>
+      {% else %}
+      <tr>
+        <td colspan="5" class="px-4 py-8 text-center text-hub-muted">No tickets found.</td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+{% endblock %}

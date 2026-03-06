@@ -1,0 +1,61 @@
+<table class="data-table">
+  <thead>
+    <tr>
+      <th>Task</th>
+      <th>Schedule</th>
+      <th>Status</th>
+      <th>Failures</th>
+      <th>Runs</th>
+      <th>Actions</th>
+    </tr>
+  </thead>
+  <tbody>
+    {% if tasks %}
+      {% for task in tasks %}
+        {% set state = states.get(task.name, {}) %}
+        {% set status = state.get('last_status', 'never') %}
+        {% set consecutive_failures = state.get('consecutive_failures', 0) %}
+        {% set run_count = state.get('run_count', 0) %}
+        <tr>
+          <td>
+            <a href="/scheduler/tasks/{{ task.slug }}" class="text-hub-accent hover:underline font-medium">
+              {{ task.name }}
+            </a>
+          </td>
+          <td class="text-hub-muted">{{ task.schedule }}</td>
+          <td>
+            <span class="badge badge-{{ status }}">{{ status }}</span>
+          </td>
+          <td>
+            {% if consecutive_failures >= 3 %}
+              <span class="text-red-400 font-medium">{{ consecutive_failures }} ⚠️</span>
+            {% else %}
+              {{ consecutive_failures }}
+            {% endif %}
+          </td>
+          <td>{{ run_count }}</td>
+          <td class="flex items-center gap-2">
+            <button class="btn btn-ghost text-xs"
+                    hx-post="/scheduler/api/run/{{ task.slug }}"
+                    hx-swap="outerHTML"
+                    hx-confirm="Run '{{ task.name }}' now?">
+              ▶ Run
+            </button>
+            <button class="btn btn-ghost text-xs"
+                    hx-post="/scheduler/api/toggle/{{ task.slug }}"
+                    hx-swap="none"
+                    hx-on::after-request="location.reload()">
+              {% if task.enabled %}Disable{% else %}Enable{% endif %}
+            </button>
+          </td>
+        </tr>
+      {% endfor %}
+    {% else %}
+      <tr>
+        <td colspan="6" class="text-center text-hub-muted py-8">
+          No tasks found. <a href="/scheduler/tasks-new" class="text-hub-accent hover:underline">Create one</a>.
+        </td>
+      </tr>
+    {% endif %}
+  </tbody>
+</table>
