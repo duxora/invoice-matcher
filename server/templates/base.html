@@ -45,6 +45,30 @@
         <span>{{ app.icon }}</span>
         <span>{{ app.name }}</span>
       </a>
+      {% if request.url.path.startswith(app.prefix) and app.prefix == '/scheduler' %}
+      <div class="ml-4 border-l border-hub-border">
+        {% set scheduler_links = [
+          ("Dashboard", "/scheduler/"),
+          ("History", "/scheduler/history"),
+          ("Errors", "/scheduler/errors"),
+          ("Tickets", "/scheduler/tickets"),
+          ("Notifications", "/scheduler/notifications"),
+          ("Approvals", "/scheduler/approvals"),
+          ("Doctor", "/scheduler/doctor"),
+        ] %}
+        {% for label, href in scheduler_links %}
+        <a href="{{ href }}"
+           class="block px-3 py-1.5 text-xs transition-colors
+                  {% if request.url.path == href %}
+                    text-hub-accent
+                  {% else %}
+                    text-hub-muted hover:text-hub-text
+                  {% endif %}">
+          {{ label }}
+        </a>
+        {% endfor %}
+      </div>
+      {% endif %}
       {% endfor %}
     </nav>
     <div class="px-5 py-3 border-t border-hub-border text-xs text-hub-muted">
