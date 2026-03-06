@@ -1,0 +1,60 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>{% block title %}Tools Hub{% endblock %}</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          colors: {
+            hub: {
+              bg: '#0f172a',
+              sidebar: '#1e293b',
+              card: '#1e293b',
+              border: '#334155',
+              text: '#e2e8f0',
+              muted: '#94a3b8',
+              accent: '#38bdf8',
+            }
+          }
+        }
+      }
+    }
+  </script>
+  <script src="https://unpkg.com/htmx.org@2.0.4"></script>
+  <link rel="stylesheet" href="/static/css/custom.css">
+</head>
+<body hx-boost="true" class="bg-hub-bg text-hub-text min-h-screen flex">
+  <!-- Sidebar -->
+  <aside class="w-56 bg-hub-sidebar border-r border-hub-border flex flex-col fixed h-full">
+    <a href="/" class="block px-5 py-4 text-lg font-bold border-b border-hub-border hover:text-hub-accent transition-colors">
+      🧰 Tools Hub
+    </a>
+    <nav class="flex-1 py-3 overflow-y-auto">
+      {% for app in apps %}
+      <a href="{{ app.prefix }}"
+         class="flex items-center gap-2 px-5 py-2 text-sm transition-colors
+                {% if request.url.path.startswith(app.prefix) %}
+                  text-hub-accent bg-hub-accent/10 border-r-2 border-hub-accent
+                {% else %}
+                  text-hub-muted hover:text-hub-text hover:bg-hub-card
+                {% endif %}">
+        <span>{{ app.icon }}</span>
+        <span>{{ app.name }}</span>
+      </a>
+      {% endfor %}
+    </nav>
+    <div class="px-5 py-3 border-t border-hub-border text-xs text-hub-muted">
+      localhost:{{ port | default(7000) }}
+    </div>
+  </aside>
+
+  <!-- Main content -->
+  <main class="ml-56 flex-1 p-6 min-h-screen">
+    {% block content %}{% endblock %}
+  </main>
+</body>
+</html>
