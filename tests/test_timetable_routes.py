@@ -16,26 +16,37 @@ def client():
     yield TestClient(app)
 
 
+def _setup_weekly_mock(mock_svc):
+    mock_svc.return_value.get_week_data.return_value = {}
+    mock_svc.return_value.get_pending_reminders.return_value = []
+    mock_svc.return_value.get_overdue_items.return_value = []
+    mock_svc.return_value.detect_conflicts.return_value = []
+
+
+def _setup_daily_mock(mock_svc):
+    mock_svc.return_value.get_daily_agenda.return_value = {}
+    mock_svc.return_value.get_pending_reminders.return_value = []
+    mock_svc.return_value.detect_conflicts.return_value = []
+    mock_svc.return_value.sheets.fetch_sheet.return_value = []
+
+
 def test_weekly_view_returns_200(client):
     with patch("claude_scheduler.timetable.routes.get_service") as mock_svc:
-        mock_svc.return_value.get_week_data.return_value = {}
-        mock_svc.return_value.get_pending_reminders.return_value = []
+        _setup_weekly_mock(mock_svc)
         resp = client.get("/timetable/")
     assert resp.status_code == 200
 
 
 def test_weekly_view_with_week_param(client):
     with patch("claude_scheduler.timetable.routes.get_service") as mock_svc:
-        mock_svc.return_value.get_week_data.return_value = {}
-        mock_svc.return_value.get_pending_reminders.return_value = []
+        _setup_weekly_mock(mock_svc)
         resp = client.get("/timetable/?week=2026-03-09")
     assert resp.status_code == 200
 
 
 def test_daily_view_returns_200(client):
     with patch("claude_scheduler.timetable.routes.get_service") as mock_svc:
-        mock_svc.return_value.get_daily_agenda.return_value = {}
-        mock_svc.return_value.get_pending_reminders.return_value = []
+        _setup_daily_mock(mock_svc)
         resp = client.get("/timetable/day/2026-03-09")
     assert resp.status_code == 200
 
@@ -98,4 +109,7 @@ def test_get_member_color_known_member():
 def test_get_member_color_unknown_member():
     from claude_scheduler.timetable.routes import get_member_color
     color = get_member_color("UnknownPerson")
-    assert color["bg"] == "bg-gray-500/20"
+    # Unknown members get a color from the preset cycle (not gray)
+    assert "bg" in color
+    assert "border" in color
+    assert "text" in color

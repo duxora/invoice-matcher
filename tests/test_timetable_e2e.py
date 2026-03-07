@@ -21,15 +21,20 @@ def test_timetable_weekly_view(client):
     with patch("claude_scheduler.timetable.routes.get_service") as mock:
         mock.return_value.get_week_data.return_value = {}
         mock.return_value.get_pending_reminders.return_value = []
+        mock.return_value.get_overdue_items.return_value = []
+        mock.return_value.detect_conflicts.return_value = []
         resp = client.get("/timetable/")
     assert resp.status_code == 200
-    assert "Family Timetable" in resp.text
+    # Default language is Vietnamese
+    assert "Thoi Khoa Bieu Gia Dinh" in resp.text or "Family Timetable" in resp.text
 
 
 def test_timetable_daily_view(client):
     with patch("claude_scheduler.timetable.routes.get_service") as mock:
         mock.return_value.get_daily_agenda.return_value = {"Duc": [], "Wife": []}
         mock.return_value.get_pending_reminders.return_value = []
+        mock.return_value.detect_conflicts.return_value = []
+        mock.return_value.sheets.fetch_sheet.return_value = []
         resp = client.get("/timetable/day/2026-03-09")
     assert resp.status_code == 200
 

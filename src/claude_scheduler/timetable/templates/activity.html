@@ -1,0 +1,57 @@
+{% extends "base.html" %}
+{% block title %}{{ t("activity_log") }} - {{ t("family_timetable") }}{% endblock %}
+
+{% block content %}
+<div class="mb-2">
+  <a href="/timetable/" class="text-hub-accent text-sm hover:underline">&larr; {{ t("back_to_week") }}</a>
+</div>
+
+<div class="mb-6">
+  <h1 class="text-2xl font-bold">{{ t("activity_log") }}</h1>
+</div>
+
+{% if log %}
+<div class="bg-hub-card border border-hub-border rounded-lg overflow-hidden">
+  <div class="overflow-x-auto">
+    <table class="w-full text-sm">
+      <thead>
+        <tr class="border-b border-hub-border text-hub-muted text-xs">
+          <th class="px-4 py-2 text-left">{{ t("time") }}</th>
+          <th class="px-4 py-2 text-left">Action</th>
+          <th class="px-4 py-2 text-left">{{ t("type") }}</th>
+          <th class="px-4 py-2 text-left">Details</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for entry in log %}
+        <tr class="border-b border-hub-border/50 hover:bg-hub-bg/50">
+          <td class="px-4 py-2 text-hub-muted text-xs whitespace-nowrap">{{ entry.timestamp[:16] }}</td>
+          <td class="px-4 py-2">
+            <span class="text-xs px-1.5 py-0.5 rounded-full
+                  {% if entry.action == 'add' %}bg-green-500/20 text-green-300
+                  {% elif entry.action == 'edit' %}bg-blue-500/20 text-blue-300
+                  {% elif entry.action == 'delete' %}bg-red-500/20 text-red-300
+                  {% endif %}">
+              {{ entry.action }}
+            </span>
+          </td>
+          <td class="px-4 py-2 text-hub-muted">{{ entry.sheet }}</td>
+          <td class="px-4 py-2 text-xs">
+            {% if entry.data %}
+            {% for k, v in entry.data.items() if v and k != '_type' %}
+            <span class="text-hub-muted">{{ k }}:</span> {{ v }}{% if not loop.last %}, {% endif %}
+            {% endfor %}
+            {% endif %}
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+{% else %}
+<div class="bg-hub-card border border-hub-border rounded-lg p-8 text-center">
+  <p class="text-hub-muted">{{ t("no_activity") }}</p>
+</div>
+{% endif %}
+{% endblock %}

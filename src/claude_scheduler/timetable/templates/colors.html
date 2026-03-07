@@ -1,0 +1,32 @@
+{% extends "base.html" %}
+{% block title %}{{ t("color_settings") }} - {{ t("family_timetable") }}{% endblock %}
+
+{% block content %}
+<div class="mb-2">
+  <a href="/timetable/" class="text-hub-accent text-sm hover:underline">&larr; {{ t("back_to_week") }}</a>
+</div>
+
+<div class="mb-6">
+  <h1 class="text-2xl font-bold">{{ t("color_settings") }}</h1>
+  <p class="text-hub-muted text-sm mt-1">Set via env: <code class="bg-hub-bg px-1 py-0.5 rounded text-xs">MEMBER_COLORS=Duc:blue,Wife:pink,...</code></p>
+</div>
+
+<div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+  {% for member in family_members %}
+  <div class="bg-hub-card border border-hub-border rounded-lg p-4">
+    <h3 class="text-sm font-semibold mb-3">{{ member }}</h3>
+    <div class="flex flex-wrap gap-2">
+      {% for color_name, color in color_presets.items() %}
+      <div class="flex items-center gap-1.5 px-2 py-1 rounded border
+                  {% if current_colors.get(member) == color_name %}{{ color.border }} {{ color.bg }}{% else %}border-hub-border{% endif %}">
+        <span class="w-4 h-4 rounded-full {{ color.bg }} {{ color.border }} border"></span>
+        <span class="text-xs {% if current_colors.get(member) == color_name %}{{ color.text }}{% else %}text-hub-muted{% endif %}">
+          {{ color_name }}
+        </span>
+      </div>
+      {% endfor %}
+    </div>
+  </div>
+  {% endfor %}
+</div>
+{% endblock %}
