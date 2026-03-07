@@ -1,0 +1,18 @@
+[policy.low]
+allowed_tools = ["Read", "Grep", "Glob"]
+denied_patterns = ["*.env", "*secret*", "*credentials*", "*password*"]
+max_calls_per_minute = 60
+
+[policy.medium]
+allowed_tools = ["Read", "Grep", "Glob", "Bash", "Edit"]
+bash_allowlist = ["git", "ruff", "pytest", "python"]
+denied_patterns = ["*.env", "*secret*"]
+require_approval = ["Edit"]
+max_calls_per_minute = 30
+
+[policy.high]
+allowed_tools = ["Read", "Grep", "Glob", "Bash", "Edit", "Write"]
+bash_allowlist = ["git", "ruff", "pytest", "python", "pip"]
+require_approval = ["Bash", "Edit", "Write"]
+network_isolation = true
+max_calls_per_minute = 10
