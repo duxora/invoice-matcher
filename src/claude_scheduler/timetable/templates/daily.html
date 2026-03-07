@@ -1,0 +1,45 @@
+{% extends "base.html" %}
+{% block title %}{{ date_label }} - Family Timetable{% endblock %}
+
+{% block content %}
+<div class="mb-2">
+  <a href="/timetable/" class="text-hub-accent text-sm hover:underline">&larr; Back to Week</a>
+</div>
+
+<div class="mb-6 flex items-center justify-between">
+  <div>
+    <h1 class="text-2xl font-bold">{{ date_label }}</h1>
+  </div>
+  <a href="/timetable/add?date_str={{ date_str }}" class="btn btn-primary">+ Add Entry</a>
+</div>
+
+<div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+  {% for person, entries in agenda.items() %}
+  {% set color = get_member_color(person) %}
+  <div class="bg-hub-card border border-hub-border rounded-lg p-4">
+    <h2 class="text-lg font-semibold mb-3 {{ color.text }}">{{ person }}</h2>
+    {% if entries %}
+    <div class="space-y-2">
+      {% for entry in entries %}
+      <div class="{{ color.bg }} rounded p-2">
+        <div class="flex items-center justify-between">
+          <span class="text-xs text-hub-muted">{{ entry.get("Time", entry.get("Start Time", "")) }}</span>
+          <span class="badge badge-{{ entry.get('_type', '')|lower }}">{{ entry.get("_type", "") }}</span>
+        </div>
+        <div class="text-sm font-medium mt-1">{{ entry.get("Title", entry.get("Subject", "")) }}</div>
+        {% if entry.get("Description") or entry.get("Topic") %}
+        <div class="text-xs text-hub-muted mt-1">{{ entry.get("Description", entry.get("Topic", "")) }}</div>
+        {% endif %}
+        {% if entry.get("Deadline") %}
+        <div class="text-xs text-yellow-400 mt-1">Due: {{ entry.Deadline }}</div>
+        {% endif %}
+      </div>
+      {% endfor %}
+    </div>
+    {% else %}
+    <p class="text-sm text-hub-muted italic">No entries</p>
+    {% endif %}
+  </div>
+  {% endfor %}
+</div>
+{% endblock %}
