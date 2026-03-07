@@ -130,10 +130,10 @@ class TestApiEdgeCases:
     def test_scan_empty_master(self):
         with tempfile.TemporaryDirectory() as tmpdir:
             (Path(tmpdir) / "master.pdf").write_bytes(b"empty")
-            mock_model = MagicMock()
-            mock_model.generate_content.return_value = _mock_gemini_response("[]")
+            mock_client = MagicMock()
+            mock_client.models.generate_content.return_value = _mock_gemini_response("[]")
 
-            with patch("invoice_matcher.gemini._get_model", return_value=mock_model):
+            with patch("invoice_matcher.gemini._get_client", return_value=mock_client):
                 resp = client.post("/api/scan", json={
                     "api_key": "fake",
                     "directory": tmpdir,
@@ -145,10 +145,10 @@ class TestApiEdgeCases:
     def test_scan_with_only_master_file(self):
         with tempfile.TemporaryDirectory() as tmpdir:
             (Path(tmpdir) / "master.pdf").write_bytes(b"master")
-            mock_model = MagicMock()
-            mock_model.generate_content.return_value = _mock_gemini_response('["INV-001"]')
+            mock_client = MagicMock()
+            mock_client.models.generate_content.return_value = _mock_gemini_response('["INV-001"]')
 
-            with patch("invoice_matcher.gemini._get_model", return_value=mock_model):
+            with patch("invoice_matcher.gemini._get_client", return_value=mock_client):
                 resp = client.post("/api/scan", json={
                     "api_key": "fake",
                     "directory": tmpdir,
@@ -164,14 +164,14 @@ class TestApiEdgeCases:
             (Path(tmpdir) / "bad.pdf").write_bytes(b"bad")
             (Path(tmpdir) / "good.pdf").write_bytes(b"good")
 
-            mock_model = MagicMock()
-            mock_model.generate_content.side_effect = [
+            mock_client = MagicMock()
+            mock_client.models.generate_content.side_effect = [
                 _mock_gemini_response('["INV-001"]'),
                 Exception("Gemini quota exceeded"),
                 _mock_gemini_response('["INV-001"]'),
             ]
 
-            with patch("invoice_matcher.gemini._get_model", return_value=mock_model):
+            with patch("invoice_matcher.gemini._get_client", return_value=mock_client):
                 resp = client.post("/api/scan", json={
                     "api_key": "fake",
                     "directory": tmpdir,

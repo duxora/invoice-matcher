@@ -1,7 +1,8 @@
 """Gemini AI integration for PDF invoice extraction."""
 import json
 import re
-import google.generativeai as genai
+from google import genai
+from google.genai import types
 
 MODEL_NAME = "gemini-2.0-flash"
 
@@ -27,9 +28,8 @@ Return ONLY a JSON array of matched master invoice numbers. If none match, retur
 No explanation, no markdown, just the JSON array."""
 
 
-def _get_model(api_key: str):
-    genai.configure(api_key=api_key)
-    return genai.GenerativeModel(MODEL_NAME)
+def _get_client(api_key: str):
+    return genai.Client(api_key=api_key)
 
 
 def _parse_invoice_list(text: str) -> list[str]:
@@ -78,11 +78,14 @@ def fuzzy_match_invoices(
 
 def extract_invoice_list(pdf_bytes: bytes, api_key: str) -> list[str]:
     """Extract all invoice numbers from a master list PDF."""
-    model = _get_model(api_key)
-    response = model.generate_content([
-        MASTER_LIST_PROMPT,
-        {"mime_type": "application/pdf", "data": pdf_bytes},
-    ])
+    client = _get_client(api_key)
+    response = client.models.generate_content(
+        model=MODEL_NAME,
+        contents=[
+            MASTER_LIST_PROMPT,
+            types.Part.from_bytes(data=pdf_bytes, mime_type="application/pdf"),
+        ],
+    )
     return _parse_invoice_list(response.text)
 
 
@@ -94,11 +97,14 @@ def extract_invoices_from_pdf(
     Returns the master list version of matched numbers.
     Handles leading zeros: master "56" matches document "000056".
     """
-    model = _get_model(api_key)
+    client = _get_client(api_key)
     prompt = MATCH_PROMPT_TEMPLATE.format(invoices=json.dumps(known_invoices))
-    response = model.generate_content([
-        prompt,
-        {"mime_type": "application/pdf", "data": pdf_bytes},
-    ])
+    response = client.models.generate_content(
+        model=MODEL_NAME,
+        contents=[
+            prompt,
+            types.Part.from_bytes(data=pdf_bytes, mime_type="application/pdf"),
+        ],
+    )
     gemini_found = _parse_invoice_list(response.text)
     return fuzzy_match_invoices(gemini_found, known_invoices)

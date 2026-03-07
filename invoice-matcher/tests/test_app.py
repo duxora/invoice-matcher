@@ -43,14 +43,14 @@ def test_full_scan_flow():
         (Path(tmpdir) / "doc1.pdf").write_bytes(b"doc1")
         (Path(tmpdir) / "doc2.pdf").write_bytes(b"doc2")
 
-        mock_model = MagicMock()
-        mock_model.generate_content.side_effect = [
+        mock_client = MagicMock()
+        mock_client.models.generate_content.side_effect = [
             _mock_gemini_response('["INV-001", "INV-002"]'),
             _mock_gemini_response('["INV-001"]'),
             _mock_gemini_response('[]'),
         ]
 
-        with patch("invoice_matcher.gemini._get_model", return_value=mock_model):
+        with patch("invoice_matcher.gemini._get_client", return_value=mock_client):
             resp = client.post("/api/scan", json={
                 "api_key": "fake-key",
                 "directory": tmpdir,
@@ -73,13 +73,13 @@ def test_full_scan_with_custom_separator():
         (Path(tmpdir) / "master.pdf").write_bytes(b"master")
         (Path(tmpdir) / "multi.pdf").write_bytes(b"multi")
 
-        mock_model = MagicMock()
-        mock_model.generate_content.side_effect = [
+        mock_client = MagicMock()
+        mock_client.models.generate_content.side_effect = [
             _mock_gemini_response('["123", "456", "789"]'),
             _mock_gemini_response('["123", "456", "789"]'),
         ]
 
-        with patch("invoice_matcher.gemini._get_model", return_value=mock_model):
+        with patch("invoice_matcher.gemini._get_client", return_value=mock_client):
             resp = client.post("/api/scan", json={
                 "api_key": "fake-key",
                 "directory": tmpdir,

@@ -19,20 +19,20 @@ class TestExtractInvoiceList:
     """Extract invoice numbers from the master file."""
 
     def test_parses_invoice_numbers_from_gemini_response(self):
-        mock_model = MagicMock()
-        mock_model.generate_content.return_value = _mock_gemini_response(
+        mock_client = MagicMock()
+        mock_client.models.generate_content.return_value = _mock_gemini_response(
             '["INV-001", "INV-002", "INV-003"]'
         )
-        with patch("invoice_matcher.gemini._get_model", return_value=mock_model):
+        with patch("invoice_matcher.gemini._get_client", return_value=mock_client):
             result = extract_invoice_list(b"fake pdf bytes", api_key="fake-key")
         assert result == ["INV-001", "INV-002", "INV-003"]
 
     def test_handles_gemini_returning_plain_list(self):
-        mock_model = MagicMock()
-        mock_model.generate_content.return_value = _mock_gemini_response(
+        mock_client = MagicMock()
+        mock_client.models.generate_content.return_value = _mock_gemini_response(
             "INV-001\nINV-002\nINV-003"
         )
-        with patch("invoice_matcher.gemini._get_model", return_value=mock_model):
+        with patch("invoice_matcher.gemini._get_client", return_value=mock_client):
             result = extract_invoice_list(b"fake pdf bytes", api_key="fake-key")
         assert result == ["INV-001", "INV-002", "INV-003"]
 
@@ -95,11 +95,11 @@ class TestExtractInvoicesFromPdf:
     """Find which invoice numbers from the master list appear in a document."""
 
     def test_finds_matching_invoice(self):
-        mock_model = MagicMock()
-        mock_model.generate_content.return_value = _mock_gemini_response(
+        mock_client = MagicMock()
+        mock_client.models.generate_content.return_value = _mock_gemini_response(
             '["INV-002"]'
         )
-        with patch("invoice_matcher.gemini._get_model", return_value=mock_model):
+        with patch("invoice_matcher.gemini._get_client", return_value=mock_client):
             result = extract_invoices_from_pdf(
                 b"fake pdf bytes",
                 known_invoices=["INV-001", "INV-002", "INV-003"],
@@ -108,9 +108,9 @@ class TestExtractInvoicesFromPdf:
         assert result == ["INV-002"]
 
     def test_returns_empty_when_no_match(self):
-        mock_model = MagicMock()
-        mock_model.generate_content.return_value = _mock_gemini_response("[]")
-        with patch("invoice_matcher.gemini._get_model", return_value=mock_model):
+        mock_client = MagicMock()
+        mock_client.models.generate_content.return_value = _mock_gemini_response("[]")
+        with patch("invoice_matcher.gemini._get_client", return_value=mock_client):
             result = extract_invoices_from_pdf(
                 b"fake pdf bytes",
                 known_invoices=["INV-001"],
@@ -120,11 +120,11 @@ class TestExtractInvoicesFromPdf:
 
     def test_fuzzy_match_leading_zeros(self):
         """Gemini finds "000056" in doc, master has "56" — returns "56"."""
-        mock_model = MagicMock()
-        mock_model.generate_content.return_value = _mock_gemini_response(
+        mock_client = MagicMock()
+        mock_client.models.generate_content.return_value = _mock_gemini_response(
             '["000056"]'
         )
-        with patch("invoice_matcher.gemini._get_model", return_value=mock_model):
+        with patch("invoice_matcher.gemini._get_client", return_value=mock_client):
             result = extract_invoices_from_pdf(
                 b"fake pdf bytes",
                 known_invoices=["56", "78", "99"],
