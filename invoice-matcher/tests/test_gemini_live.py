@@ -30,9 +30,11 @@ skip_no_fixtures = pytest.mark.skipif(
 @skip_no_key
 @skip_no_fixtures
 class TestLiveExtractInvoiceList:
-    def test_extracts_invoices_from_master_pdf(self):
+    def test_extracts_invoices_from_master_pdf(self, save_output):
         pdf_bytes = (FIXTURES_DIR / "master.pdf").read_bytes()
         invoices = extract_invoice_list(pdf_bytes, api_key=GEMINI_API_KEY)
+
+        save_output({"master_invoices": invoices}, "master_invoices.json")
 
         assert len(invoices) >= 3
         invoice_text = " ".join(invoices).upper()
@@ -44,18 +46,22 @@ class TestLiveExtractInvoiceList:
 @skip_no_key
 @skip_no_fixtures
 class TestLiveExtractInvoicesFromPdf:
-    def test_finds_matching_invoice_in_document(self):
+    def test_finds_matching_invoice_in_document(self, save_output):
         pdf_bytes = (FIXTURES_DIR / "doc_scan_001.pdf").read_bytes()
         known = ["INV-2024-001", "INV-2024-002", "INV-2024-003"]
         found = extract_invoices_from_pdf(pdf_bytes, known_invoices=known, api_key=GEMINI_API_KEY)
 
+        save_output({"file": "doc_scan_001.pdf", "found": found}, "match_result.json")
+
         assert len(found) >= 1
         assert any("001" in inv for inv in found)
 
-    def test_no_match_in_unrelated_document(self):
+    def test_no_match_in_unrelated_document(self, save_output):
         pdf_bytes = (FIXTURES_DIR / "doc_scan_003.pdf").read_bytes()
         known = ["INV-2024-001", "INV-2024-002", "INV-2024-003"]
         found = extract_invoices_from_pdf(pdf_bytes, known_invoices=known, api_key=GEMINI_API_KEY)
+
+        save_output({"file": "doc_scan_003.pdf", "found": found}, "no_match_result.json")
 
         assert found == []
 
@@ -63,7 +69,7 @@ class TestLiveExtractInvoicesFromPdf:
 @skip_no_key
 @skip_no_fixtures
 class TestLiveEndToEnd:
-    def test_full_scan_and_rename_flow(self):
+    def test_full_scan_and_rename_flow(self, save_output):
         with tempfile.TemporaryDirectory() as tmpdir:
             for f in FIXTURES_DIR.iterdir():
                 if f.suffix == ".pdf":
@@ -96,3 +102,7 @@ class TestLiveEndToEnd:
 
             for item in results["renamed"]:
                 assert (tmpdir_path / item["new"]).exists()
+
+            # Save all outputs for inspection
+            save_output({"master_invoices": master_invoices, "matches": matches, "plan": plan, "results": results}, "full_flow.json")
+            save_output(tmpdir_path, "renamed_files")
