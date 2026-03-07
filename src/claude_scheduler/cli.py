@@ -337,6 +337,96 @@ def cmd_feedback(args):
     console.print(f"[green]Feedback recorded[/green] for day {entry['day']}: rating {args.rating}/5")
 
 
+# ── Workflow ──
+
+def cmd_workflow_run(args):
+    from claude_scheduler.workflow.parser import parse_workflow
+    from claude_scheduler.workflow.runner import WorkflowRunner
+    cfg = get_config()
+    wf = parse_workflow(Path(args.workflow_file))
+    if args.dry_run:
+        t = Table(show_header=False, box=None)
+        t.add_row("[bold]Workflow[/bold]", wf.name)
+        t.add_row("[bold]Trigger[/bold]", wf.trigger)
+        t.add_row("[bold]Steps[/bold]", str(len(wf.steps)))
+        t.add_row("[bold]Security[/bold]", wf.security_level)
+        for s in wf.steps:
+            t.add_row(f"  Step {s.order}", s.description)
+        console.print(t)
+        return
+    runner = WorkflowRunner(logs_dir=cfg.paths.logs_dir)
+    result = runner.run(wf)
+    if result["status"] == "success":
+        console.print(f"[green]Workflow '{wf.name}' completed successfully[/green]")
+    else:
+        console.print(f"[red]Workflow '{wf.name}' failed at step {result.get('failed_step')}[/red]")
+
+def cmd_workflow_list(args):
+    from claude_scheduler.workflow.parser import find_workflows
+    cfg = get_config()
+    workflows = find_workflows(cfg.paths.tasks_dir)
+    if not workflows:
+        console.print("[dim]No workflows found.[/dim]")
+        return
+    t = Table(title="Workflows")
+    t.add_column("Name")
+    t.add_column("Trigger")
+    t.add_column("Steps")
+    t.add_column("Security")
+    for wf in workflows:
+        t.add_row(wf.name, wf.trigger, str(len(wf.steps)), wf.security_level)
+    console.print(t)
+
+def cmd_workflow_from_sop(args):
+    console.print("[yellow]SOP converter will be implemented in Phase 5[/yellow]")
+
+
+# ── Gateway ──
+
+def cmd_gateway_audit(args):
+    from claude_scheduler.gateway.audit import AuditLogger
+    cfg = get_config()
+    logger = AuditLogger(cfg.paths.data_dir / "audit.jsonl")
+    entries = logger.query(task=args.task or "")
+    if not entries:
+        console.print("[dim]No audit entries found.[/dim]")
+        return
+    t = Table(title="Audit Log")
+    t.add_column("Time")
+    t.add_column("Task")
+    t.add_column("Tool")
+    t.add_column("Args", max_width=40)
+    t.add_column("Decision")
+    t.add_column("Reason")
+    for e in entries[-50:]:
+        style = "green" if e["decision"] == "allow" else "red"
+        t.add_row(
+            e["ts"][:19], e["task"], e["tool"],
+            e.get("args", "")[:40], f"[{style}]{e['decision']}[/{style}]",
+            e.get("reason", ""),
+        )
+    console.print(t)
+
+def cmd_gateway_policy_list(args):
+    from claude_scheduler.gateway.policy import load_policies
+    cfg = get_config()
+    policy_file = cfg.paths.tasks_dir.parent / "policies" / "default.toml"
+    if not policy_file.exists():
+        console.print(f"[dim]No policy file at {policy_file}[/dim]")
+        return
+    policies = load_policies(policy_file)
+    for name, p in policies.items():
+        console.print(Panel(
+            f"Tools: {', '.join(p.allowed_tools)}\n"
+            f"Denied: {', '.join(p.denied_patterns)}\n"
+            f"Bash: {', '.join(p.bash_allowlist) or 'any'}\n"
+            f"Approval: {', '.join(p.require_approval) or 'none'}\n"
+            f"Rate: {p.max_calls_per_minute}/min\n"
+            f"Network isolation: {p.network_isolation}",
+            title=f"Policy: {name}",
+        ))
+
+
 # ── Argument parser ──
 
 def main():
@@ -449,6 +539,33 @@ def main():
     p.add_argument("--rating", "-r", type=int, required=True, choices=[1, 2, 3, 4, 5])
     p.add_argument("--note", "-n", help="Optional feedback note")
     p.set_defaults(func=cmd_feedback)
+
+    # workflow
+    wf_parser = sub.add_parser("workflow", help="Workflow management")
+    wf_sub = wf_parser.add_subparsers(dest="wf_command", required=True)
+
+    p = wf_sub.add_parser("run", help="Run a workflow")
+    p.add_argument("workflow_file")
+    p.add_argument("--dry-run", action="store_true")
+    p.set_defaults(func=cmd_workflow_run)
+
+    p = wf_sub.add_parser("list", help="List workflows")
+    p.set_defaults(func=cmd_workflow_list)
+
+    p = wf_sub.add_parser("from-sop", help="Convert SOP to workflow")
+    p.add_argument("sop_file")
+    p.set_defaults(func=cmd_workflow_from_sop)
+
+    # gateway
+    gw_parser = sub.add_parser("gateway", help="Security gateway")
+    gw_sub = gw_parser.add_subparsers(dest="gw_command", required=True)
+
+    p = gw_sub.add_parser("audit", help="View audit log")
+    p.add_argument("--task", "-t")
+    p.set_defaults(func=cmd_gateway_audit)
+
+    p = gw_sub.add_parser("policy", help="List policies")
+    p.set_defaults(func=cmd_gateway_policy_list)
 
     argcomplete.autocomplete(parser)
     args = parser.parse_args()
