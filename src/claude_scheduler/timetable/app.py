@@ -1,4 +1,4 @@
-"""Standalone Family Timetable web application."""
+"""Standalone Family Timetable SPA."""
 import os
 from pathlib import Path
 from dotenv import load_dotenv
@@ -11,29 +11,16 @@ else:
     load_dotenv()
 
 from fastapi import FastAPI, Request
-from fastapi.responses import HTMLResponse
-from fastapi.staticfiles import StaticFiles
-from fastapi.templating import Jinja2Templates
-from jinja2 import FileSystemLoader
+from fastapi.responses import FileResponse, HTMLResponse
 from starlette.middleware.sessions import SessionMiddleware
 
-from claude_scheduler.timetable.routes import router as timetable_router
+from claude_scheduler.timetable.api import api_router
 from claude_scheduler.timetable.auth import auth_router, require_auth
 
-app = FastAPI(
-    title="Family Timetable",
-    description="Family timetable & study planner",
-    version="1.0.0",
-)
+app = FastAPI(title="Family Timetable", version="2.0.0")
 
 TIMETABLE_DIR = Path(__file__).parent
-TEMPLATES_DIR = TIMETABLE_DIR / "templates"
-templates = Jinja2Templates(directory=str(TEMPLATES_DIR))
-
-# Static files (Tailwind loaded via CDN, but mount for any future local assets)
-_static_dir = TIMETABLE_DIR / "static"
-if _static_dir.exists():
-    app.mount("/static", StaticFiles(directory=str(_static_dir)), name="static")
+INDEX_HTML = TIMETABLE_DIR / "static" / "index.html"
 
 app.add_middleware(
     SessionMiddleware,
@@ -43,14 +30,9 @@ app.add_middleware(
 # Auth middleware
 app.middleware("http")(require_auth)
 app.include_router(auth_router)
-
-# Mount timetable routes at root (standalone app, no /timetable prefix)
-app.include_router(timetable_router)
+app.include_router(api_router)
 
 
-@app.exception_handler(404)
-async def not_found(request: Request, exc):
-    return HTMLResponse(
-        content="<h1>Not Found</h1><a href='/'>Back to Timetable</a>",
-        status_code=404,
-    )
+@app.get("/", response_class=HTMLResponse)
+async def spa_index():
+    return FileResponse(INDEX_HTML)
