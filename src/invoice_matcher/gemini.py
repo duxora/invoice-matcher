@@ -1,4 +1,4 @@
-"""Gemini AI integration for PDF invoice extraction."""
+"""Gemini AI integration for document invoice extraction."""
 import json
 import re
 from google import genai
@@ -6,14 +6,29 @@ from google.genai import types
 
 MODEL_NAME = "gemini-2.0-flash"
 
+MIME_TYPES = {
+    ".pdf": "application/pdf",
+    ".png": "image/png",
+    ".jpg": "image/jpeg",
+    ".jpeg": "image/jpeg",
+    ".tiff": "image/tiff",
+    ".tif": "image/tiff",
+    ".doc": "application/msword",
+    ".docx": "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+    ".xls": "application/vnd.ms-excel",
+    ".xlsx": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+    ".ppt": "application/vnd.ms-powerpoint",
+    ".pptx": "application/vnd.openxmlformats-officedocument.presentationml.presentation",
+}
+
 MASTER_LIST_PROMPT = """You are an invoice number extractor.
-This PDF is a master list of invoice numbers (buying and selling).
+This document is a master list of invoice numbers (buying and selling).
 Extract ALL invoice numbers from this document.
 Return ONLY a JSON array of invoice number strings. Example: ["INV-001", "INV-002"]
 No explanation, no markdown, just the JSON array."""
 
 MATCH_PROMPT_TEMPLATE = """You are an invoice number matcher.
-This PDF is a business document (invoice, receipt, purchase order, etc).
+This document is a business document (invoice, receipt, purchase order, etc).
 Here is a list of known invoice numbers from the master list: {invoices}
 
 Find which of these invoice numbers appear in this document.
@@ -26,6 +41,13 @@ For example, if master has "56" and document has "000056", return "56".
 
 Return ONLY a JSON array of matched master invoice numbers. If none match, return [].
 No explanation, no markdown, just the JSON array."""
+
+
+def _get_mime_type(filename: str) -> str:
+    """Get MIME type from filename extension."""
+    from pathlib import Path
+    ext = Path(filename).suffix.lower()
+    return MIME_TYPES.get(ext, "application/octet-stream")
 
 
 def _get_client(api_key: str):
@@ -76,34 +98,36 @@ def fuzzy_match_invoices(
     return matched
 
 
-def extract_invoice_list(pdf_bytes: bytes, api_key: str) -> list[str]:
-    """Extract all invoice numbers from a master list PDF."""
+def extract_invoice_list(file_bytes: bytes, api_key: str, filename: str = "file.pdf") -> list[str]:
+    """Extract all invoice numbers from a master list document."""
+    mime_type = _get_mime_type(filename)
     client = _get_client(api_key)
     response = client.models.generate_content(
         model=MODEL_NAME,
         contents=[
             MASTER_LIST_PROMPT,
-            types.Part.from_bytes(data=pdf_bytes, mime_type="application/pdf"),
+            types.Part.from_bytes(data=file_bytes, mime_type=mime_type),
         ],
     )
     return _parse_invoice_list(response.text)
 
 
 def extract_invoices_from_pdf(
-    pdf_bytes: bytes, known_invoices: list[str], api_key: str
+    file_bytes: bytes, known_invoices: list[str], api_key: str, filename: str = "file.pdf"
 ) -> list[str]:
-    """Find which known invoice numbers appear in a PDF document.
+    """Find which known invoice numbers appear in a document.
 
     Returns the master list version of matched numbers.
     Handles leading zeros: master "56" matches document "000056".
     """
+    mime_type = _get_mime_type(filename)
     client = _get_client(api_key)
     prompt = MATCH_PROMPT_TEMPLATE.format(invoices=json.dumps(known_invoices))
     response = client.models.generate_content(
         model=MODEL_NAME,
         contents=[
             prompt,
-            types.Part.from_bytes(data=pdf_bytes, mime_type="application/pdf"),
+            types.Part.from_bytes(data=file_bytes, mime_type=mime_type),
         ],
     )
     gemini_found = _parse_invoice_list(response.text)
