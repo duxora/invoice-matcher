@@ -1,0 +1,1 @@
+"""Family Timetable app."""
