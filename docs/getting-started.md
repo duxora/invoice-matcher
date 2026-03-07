@@ -1,21 +1,52 @@
 # Getting Started — Invoice Matcher
 
-## Prerequisites
+## Step 1: Install Python
 
-- **Python 3.10+** installed on your machine
-- **Gemini API key** (free) — get one at https://aistudio.google.com/apikey
-- Internet connection (for Gemini API calls)
+You need Python 3.10 or newer.
 
-## Installation
+**On macOS:**
+1. Open **Terminal** (press `Cmd + Space`, type "Terminal", press Enter)
+2. Type `python3 --version` and press Enter
+3. If you see `Python 3.10` or higher, skip to Step 2
+4. If not, download Python from https://www.python.org/downloads/ and run the installer
 
-### 1. Clone the repository
+**On Windows:**
+1. Open **Command Prompt** (press `Win` key, type "cmd", press Enter)
+2. Type `python --version` and press Enter
+3. If you see `Python 3.10` or higher, skip to Step 2
+4. If not:
+   - Download Python from https://www.python.org/downloads/
+   - **IMPORTANT:** During installation, check the box **"Add Python to PATH"**
+   - Run the installer
+
+## Step 2: Get a Gemini API Key (Free)
+
+1. Go to https://aistudio.google.com/apikey
+2. Sign in with your Google account
+3. Click **"Create API Key"**
+4. Select any project (or create a new one)
+5. Copy the key — it looks like `AIzaSy...` (about 40 characters)
+
+> **Cost:** The free tier gives you 15 requests/minute and 1,500 requests/day — enough for ~1,500 files per day at no cost.
+
+## Step 3: Install Invoice Matcher
+
+### Option A: Clone the repository
 
 ```bash
 git clone https://github.com/duxora/invoice-matcher.git
 cd invoice-matcher
 ```
 
-### 2. Install dependencies
+### Option B: From a received folder
+
+Open Terminal (Mac) or Command Prompt (Windows), navigate to the invoice-matcher folder:
+```bash
+cd path/to/invoice-matcher
+```
+**Tip (Mac):** Type `cd ` then drag the folder from Finder into Terminal to auto-fill the path.
+
+### Install
 
 ```bash
 pip install -e .
@@ -26,7 +57,9 @@ On macOS, if `pip` is not found:
 pip3 install -e .
 ```
 
-### 3. Start the app
+You should see "Successfully installed invoice-matcher" at the end.
+
+## Step 4: Start the App
 
 ```bash
 invoice-matcher
