@@ -8,7 +8,9 @@ You have a folder full of scanned PDFs — invoices, receipts, purchase orders. 
 
 **Handles fuzzy matching:** If the master list has "56" but the document shows "000056", it still matches and renames to "56".
 
-**Multiple invoices per file:** If one PDF contains multiple invoices, all numbers are included in the filename (e.g., `123_456_789.pdf`).
+**Multiple invoices per file:** If one PDF contains multiple invoices, all numbers are included in the filename (e.g., `123-456-789.pdf`).
+
+**Non-destructive:** Original files are never modified — renamed copies are saved to a separate output folder.
 
 **Before:**
 ```
@@ -18,12 +20,11 @@ scan_003.pdf    <- no invoice found
 master_list.pdf <- lists all invoice numbers
 ```
 
-**After:**
+**After (in outputs folder):**
 ```
-HD-2024-0042.pdf
-HD-2024-0107.pdf
-scan_003.pdf        <- unchanged (no match)
-master_list.pdf     <- unchanged (master file)
+outputs/
+  HD-2024-0042.pdf
+  HD-2024-0107.pdf
 ```
 
 ---
@@ -62,7 +63,7 @@ You need Python 3.10 or newer on your computer.
 3. Click **"Create API Key"**
 4. Select any project (or create a new one)
 5. Copy the key — it looks like `AIzaSy...` (about 40 characters)
-6. Save it somewhere safe — you'll paste it into the app each time you use it
+6. Save it somewhere safe — you'll paste it into the app once (it's saved locally)
 
 > **Cost:** The free tier gives you 15 requests/minute and 1,500 requests/day.
 > That's enough for ~1,500 PDF files per day at no cost.
@@ -106,27 +107,45 @@ You should see the Invoice Matcher web page.
 
 ## How to Use
 
-### 1. Prepare Your Files
+### 1. Configure API Key (first time only)
 
-Put all your PDFs in **one folder**:
-- The master invoice list (a PDF that contains all your invoice numbers)
-- All the document PDFs you want to match and rename
+Click **Settings** in the top right, paste your Gemini API key, and click **Save**. The key is stored locally on your computer.
 
-### 2. Fill in the Form
+### 2. Select Invoice Files
+
+You have three options:
+
+| Method | How |
+|--------|-----|
+| **Select Folder** | Click "Select Folder" — a native folder picker opens. Select the folder containing your PDFs. |
+| **Upload ZIP** | Click "Upload ZIP" — select a .zip file containing your PDFs. The app extracts them automatically. |
+| **Paste path** | Type or paste the full folder path directly into the text field. |
+
+### 3. Select Master File
+
+The master file is the PDF that lists all your invoice numbers.
+
+- **From directory:** If you selected a folder, a dropdown appears with all PDFs in that folder — pick the master file.
+- **Browse:** Click "Browse" to select any PDF file from your computer.
+
+### 4. Set Output Folder (optional)
+
+Where renamed files will be saved.
+
+- **Default:** An `outputs` subfolder is created inside the source folder.
+- **Custom:** Click "Browse" or paste a path to choose a different location.
+- **Required** when using ZIP upload.
+
+> **Note:** Original files are never modified — copies are saved to the output folder.
+
+### 5. Fill in the Form
 
 | Field | What to enter |
 |-------|--------------|
-| **Gemini API Key** | Paste the key from Step 2 above |
-| **Directory Path** | The full path to your PDF folder |
-| **Master Invoice File** | Select the file that lists all invoice numbers |
 | **Filename Pattern** | How you want files renamed (see below) |
-| **Multi-Invoice Separator** | Character between multiple invoice numbers (default: `_`) |
+| **Multi-Invoice Separator** | Character between multiple invoice numbers (default: `/`) |
 
-**How to find your folder path:**
-- **Mac:** Open Finder, navigate to your folder, then drag it into Terminal — the path appears automatically
-- **Windows:** Open the folder in File Explorer, click the address bar at the top, and copy the path
-
-### 3. Filename Patterns
+### 6. Filename Patterns
 
 The pattern controls how matched files get renamed. File extension (.pdf) is always kept automatically.
 
@@ -139,17 +158,17 @@ The pattern controls how matched files get renamed. File extension (.pdf) is alw
 
 > **Note:** Numbers use the master list version (e.g., master has "56", even if the document shows "000056").
 
-### 4. Multi-Invoice Separator
+### 7. Multi-Invoice Separator
 
-When a PDF contains multiple invoices, they are joined with the separator:
+When a PDF contains multiple invoices, they are joined with the separator. Default is `/`, but since `/` is invalid in filenames, it's automatically replaced with `-`.
 
 | Separator | Example Result |
 |-----------|---------------|
-| `_` (default) | `123_456_789.pdf` |
+| `/` (default) | `123-456-789.pdf` (replaced with `-`) |
+| `_` | `123_456_789.pdf` |
 | `-` | `123-456-789.pdf` |
-| `+` | `123+456+789.pdf` |
 
-### 5. Scan & Review
+### 8. Scan & Review
 
 1. Click **"Scan & Match"** — wait while Gemini reads each PDF (a few seconds per file)
 2. Review the results table:
@@ -158,7 +177,8 @@ When a PDF contains multiple invoices, they are joined with the separator:
 3. If everything looks correct, click **"Rename Files"**
 
 > **Safe to use:** The app shows you a preview before renaming anything.
-> Files that already have the target name are skipped (no overwriting).
+> Original files are preserved — renamed copies go to the output folder.
+> Files that already exist in the output folder are skipped (no overwriting).
 
 ---
 
