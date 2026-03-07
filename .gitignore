@@ -8,3 +8,5 @@ logs/
 dist/
 build/
 .eggs/
+credentials.json
+.env
