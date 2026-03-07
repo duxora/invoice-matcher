@@ -67,9 +67,27 @@ class SheetsClient:
         return self._spreadsheet
 
     def _open_spreadsheet(self):
-        creds = Credentials.from_service_account_file(self.credentials_path, scopes=SCOPES)
-        gc = gspread.authorize(creds)
-        return gc.open_by_key(self.spreadsheet_id)
+        if not self.credentials_path or not Path(self.credentials_path).exists():
+            raise ConnectionError(
+                f"Google credentials file not found: {self.credentials_path}. "
+                "Set GOOGLE_CREDENTIALS_PATH in ~/.config/claude-scheduler/.env"
+            )
+        if not self.spreadsheet_id:
+            raise ConnectionError(
+                "TIMETABLE_SPREADSHEET_ID not set. "
+                "Set it in ~/.config/claude-scheduler/.env"
+            )
+        try:
+            creds = Credentials.from_service_account_file(self.credentials_path, scopes=SCOPES)
+            gc = gspread.authorize(creds)
+            return gc.open_by_key(self.spreadsheet_id)
+        except PermissionError:
+            raise ConnectionError(
+                "Google Sheets permission denied. "
+                "Share the spreadsheet with your service account email as Editor."
+            )
+        except Exception as e:
+            raise ConnectionError(f"Google Sheets connection failed: {e}")
 
     def fetch_sheet(self, sheet_name: str) -> list[dict[str, Any]]:
         """Fetch all records from a sheet, with caching."""
@@ -79,7 +97,17 @@ class SheetsClient:
             if now - cached_time < self._cache_ttl:
                 return cached_data
 
-        ws = self.spreadsheet.worksheet(sheet_name)
+        try:
+            ws = self.spreadsheet.worksheet(sheet_name)
+        except gspread.exceptions.WorksheetNotFound:
+            # Auto-create missing worksheet with proper headers
+            ws = self.spreadsheet.add_worksheet(title=sheet_name, rows=100, cols=10)
+            columns = SHEET_COLUMNS.get(sheet_name, [])
+            if columns:
+                ws.append_row(columns)
+            self._cache[sheet_name] = (now, [])
+            return []
+
         records = ws.get_all_records()
         self._cache[sheet_name] = (now, records)
         return records

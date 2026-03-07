@@ -45,12 +45,6 @@ async def not_found(request: Request, exc):
         "message": "The page you're looking for doesn't exist.",
     }, status_code=404)
 
-# Catch Python PermissionError (raised by gspread when Sheets access is denied)
-@app.exception_handler(PermissionError)
-async def permission_error(request: Request, exc):
-    from claude_scheduler.timetable.auth import _setup_error_html
-    return HTMLResponse(content=_setup_error_html(str(exc)), status_code=200)
-
 @app.exception_handler(500)
 async def server_error(request: Request, exc):
     return templates.TemplateResponse("error.html", {

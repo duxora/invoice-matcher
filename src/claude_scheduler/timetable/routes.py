@@ -1,10 +1,8 @@
 """Timetable web routes -- weekly view, daily view, add/edit entries, templates, iCal."""
 import os
 from datetime import date, timedelta
-from functools import lru_cache
-
 from fastapi import APIRouter, Form, Query, Request
-from fastapi.responses import HTMLResponse, RedirectResponse, Response
+from fastapi.responses import HTMLResponse, RedirectResponse, Response  # noqa: F811
 from fastapi.templating import Jinja2Templates
 from jinja2 import ChoiceLoader, FileSystemLoader
 from pathlib import Path
@@ -55,12 +53,20 @@ if _color_config:
             MEMBER_COLOR_MAP[name.strip()] = color.strip()
 
 
-@lru_cache(maxsize=1)
+_service: TimetableService | None = None
+
 def get_service() -> TimetableService:
-    spreadsheet_id = os.environ.get("TIMETABLE_SPREADSHEET_ID", "")
-    credentials_path = os.environ.get("GOOGLE_CREDENTIALS_PATH", "")
-    client = SheetsClient(spreadsheet_id=spreadsheet_id, credentials_path=credentials_path)
-    return TimetableService(client, family_members=FAMILY_MEMBERS)
+    global _service
+    if _service is None:
+        spreadsheet_id = os.environ.get("TIMETABLE_SPREADSHEET_ID", "")
+        credentials_path = os.environ.get("GOOGLE_CREDENTIALS_PATH", "")
+        client = SheetsClient(spreadsheet_id=spreadsheet_id, credentials_path=credentials_path)
+        _service = TimetableService(client, family_members=FAMILY_MEMBERS)
+    return _service
+
+def _reset_service():
+    global _service
+    _service = None
 
 
 def app_context(request: Request, **kwargs):
@@ -125,10 +131,10 @@ async def weekly_view(request: Request, week: str | None = None, member: str = "
         reminders = svc.get_pending_reminders()
         overdue = svc.get_overdue_items()
         conflicts_today = svc.detect_conflicts(today.isoformat())
-    except (PermissionError, Exception) as e:
-        return templates.TemplateResponse("error_setup.html", app_context(
-            request, error=str(e),
-        ))
+    except Exception as e:
+        _reset_service()  # allow retry after fixing config
+        from claude_scheduler.timetable.auth import _setup_error_html
+        return HTMLResponse(content=_setup_error_html(str(e)))
 
     days = []
     for i in range(7):
@@ -159,9 +165,14 @@ async def weekly_view(request: Request, week: str | None = None, member: str = "
 @router.get("/day/{date_str}", response_class=HTMLResponse)
 async def daily_view(request: Request, date_str: str, member: str = ""):
     svc = get_service()
-    agenda = svc.get_daily_agenda(date_str, member=member)
-    reminders = svc.get_pending_reminders()
-    conflicts = svc.detect_conflicts(date_str)
+    try:
+        agenda = svc.get_daily_agenda(date_str, member=member)
+        reminders = svc.get_pending_reminders()
+        conflicts = svc.detect_conflicts(date_str)
+    except Exception as e:
+        _reset_service()
+        from claude_scheduler.timetable.auth import _setup_error_html
+        return HTMLResponse(content=_setup_error_html(str(e)))
     d = date.fromisoformat(date_str)
 
     # Add row indices to entries for edit/delete links
