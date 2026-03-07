@@ -1,5 +1,8 @@
 """Google Sheets client for Family Timetable."""
+import base64
 import json
+import os
+import tempfile
 import time as _time
 from datetime import datetime
 from pathlib import Path
@@ -49,6 +52,19 @@ def get_activity_log(limit: int = 50) -> list[dict]:
     return entries
 
 
+def resolve_credentials_path(path: str) -> str:
+    """Resolve credentials: file path or GOOGLE_CREDENTIALS_JSON base64 env var."""
+    if path and Path(path).exists():
+        return path
+    b64 = os.environ.get("GOOGLE_CREDENTIALS_JSON", "")
+    if b64:
+        decoded = base64.b64decode(b64)
+        tmp = Path(tempfile.gettempdir()) / "google-credentials.json"
+        tmp.write_bytes(decoded)
+        return str(tmp)
+    return path
+
+
 class SheetsClient:
     """Two-way sync client for Google Sheets."""
 
@@ -67,6 +83,7 @@ class SheetsClient:
         return self._spreadsheet
 
     def _open_spreadsheet(self):
+        self.credentials_path = resolve_credentials_path(self.credentials_path)
         if not self.credentials_path or not Path(self.credentials_path).exists():
             raise ConnectionError(
                 f"Google credentials file not found: {self.credentials_path}. "

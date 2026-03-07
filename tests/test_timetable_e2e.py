@@ -1,6 +1,6 @@
-"""End-to-end smoke test for timetable standalone app."""
+"""End-to-end smoke tests for timetable SPA."""
 import pytest
-from unittest.mock import patch, MagicMock
+from unittest.mock import patch
 from fastapi.testclient import TestClient
 
 
@@ -11,37 +11,37 @@ def client():
         yield TestClient(app)
 
 
-def test_timetable_weekly_view(client):
-    with patch("claude_scheduler.timetable.routes.get_service") as mock:
+def test_spa_loads(client):
+    resp = client.get("/")
+    assert resp.status_code == 200
+    assert "x-data" in resp.text
+    assert "Family Timetable" in resp.text
+
+
+def test_api_config(client):
+    resp = client.get("/api/config")
+    assert resp.status_code == 200
+    data = resp.json()
+    assert "family_members" in data
+    assert "colors" in data
+
+
+def test_api_week(client):
+    with patch("claude_scheduler.timetable.api.get_service") as mock:
         mock.return_value.get_week_data.return_value = {}
         mock.return_value.get_pending_reminders.return_value = []
         mock.return_value.get_overdue_items.return_value = []
         mock.return_value.detect_conflicts.return_value = []
-        resp = client.get("/")
+        resp = client.get("/api/week")
     assert resp.status_code == 200
-    assert "Thoi Khoa Bieu Gia Dinh" in resp.text or "Family Timetable" in resp.text
+    assert len(resp.json()["days"]) == 7
 
 
-def test_timetable_daily_view(client):
-    with patch("claude_scheduler.timetable.routes.get_service") as mock:
-        mock.return_value.get_daily_agenda.return_value = {"Duc": [], "Wife": []}
-        mock.return_value.get_pending_reminders.return_value = []
-        mock.return_value.detect_conflicts.return_value = []
-        mock.return_value.sheets.fetch_sheet.return_value = []
-        resp = client.get("/day/2026-03-09")
-    assert resp.status_code == 200
-
-
-def test_timetable_add_form(client):
-    resp = client.get("/add")
-    assert resp.status_code == 200
-
-
-def test_full_flow_add_and_redirect(client):
-    with patch("claude_scheduler.timetable.routes.get_service") as mock:
-        resp = client.post("/add", data={
+def test_api_create_entry(client):
+    with patch("claude_scheduler.timetable.api.get_service") as mock:
+        resp = client.post("/api/entries", json={
             "sheet": "Tasks", "date": "2026-03-09", "time": "09:00",
             "person": "Duc", "title": "Test",
-        }, follow_redirects=False)
-    assert resp.status_code == 303
-    assert "/day/2026-03-09" in resp.headers["location"]
+        })
+    assert resp.status_code == 200
+    assert resp.json()["ok"] is True
