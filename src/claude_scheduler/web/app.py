@@ -1,5 +1,14 @@
 """Claude Scheduler — FastAPI web application."""
 import os
+from pathlib import Path
+from dotenv import load_dotenv
+
+# Load .env from ~/.config/claude-scheduler/, fallback to project root
+_config_env = Path.home() / ".config" / "claude-scheduler" / ".env"
+if _config_env.exists():
+    load_dotenv(_config_env)
+else:
+    load_dotenv()  # fallback: project root .env
 
 from fastapi import FastAPI, Request
 from fastapi.responses import HTMLResponse
