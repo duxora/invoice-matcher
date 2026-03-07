@@ -8,23 +8,24 @@
     <p class="text-hub-muted text-sm">{{ week_label }}</p>
   </div>
   <div class="flex flex-wrap items-center gap-2">
-    <a href="/timetable/?week={{ prev_week }}{% if selected_member %}&member={{ selected_member }}{% endif %}" class="btn btn-ghost text-sm">&larr; {{ t("prev") }}</a>
-    <a href="/timetable/{% if selected_member %}?member={{ selected_member }}{% endif %}" class="btn btn-ghost text-sm">{{ t("today") }}</a>
-    <a href="/timetable/?week={{ next_week }}{% if selected_member %}&member={{ selected_member }}{% endif %}" class="btn btn-ghost text-sm">{{ t("next") }} &rarr;</a>
-    <a href="/timetable/add" class="btn btn-primary text-sm">+ {{ t("add") }}</a>
+    <a href="/?week={{ prev_week }}{% if selected_member %}&member={{ selected_member }}{% endif %}" class="btn btn-ghost text-sm">&larr; {{ t("prev") }}</a>
+    <a href="/{% if selected_member %}?member={{ selected_member }}{% endif %}" class="btn btn-ghost text-sm">{{ t("today") }}</a>
+    <a href="/?week={{ next_week }}{% if selected_member %}&member={{ selected_member }}{% endif %}" class="btn btn-ghost text-sm">{{ t("next") }} &rarr;</a>
+    <a href="/month" class="btn btn-ghost text-sm">{{ t("month_view") }}</a>
+    <a href="/add" class="btn btn-primary text-sm">+ {{ t("add") }}</a>
   </div>
 </div>
 
 {# Member filter #}
 <div class="flex flex-wrap gap-2 mb-4">
-  <a href="/timetable/?week={{ days[0].date }}"
+  <a href="/?week={{ days[0].date }}"
      class="px-3 py-1 rounded-full text-xs border transition-colors
             {% if not selected_member %}bg-hub-accent/20 border-hub-accent text-hub-accent{% else %}border-hub-border text-hub-muted hover:text-hub-text{% endif %}">
     {{ t("filter_all") }}
   </a>
   {% for member in family_members %}
   {% set color = get_member_color(member) %}
-  <a href="/timetable/?week={{ days[0].date }}&member={{ member }}"
+  <a href="/?week={{ days[0].date }}&member={{ member }}"
      class="px-3 py-1 rounded-full text-xs border transition-colors
             {% if selected_member == member %}{{ color.bg }} {{ color.border }} {{ color.text }}{% else %}border-hub-border text-hub-muted hover:text-hub-text{% endif %}">
     {{ member }}
@@ -71,7 +72,7 @@
   {% for day in days %}
   <div class="bg-hub-card border rounded-lg p-3 min-h-[140px] lg:min-h-[200px]
               {% if day.is_today %}border-hub-accent ring-1 ring-hub-accent/30{% else %}border-hub-border{% endif %}">
-    <a href="/timetable/day/{{ day.date }}{% if selected_member %}?member={{ selected_member }}{% endif %}"
+    <a href="/day/{{ day.date }}{% if selected_member %}?member={{ selected_member }}{% endif %}"
        class="block text-sm font-medium mb-2 hover:text-hub-accent transition-colors
               {% if day.is_today %}text-hub-accent{% endif %}">
       {{ day.label }}
@@ -88,7 +89,7 @@
       </div>
       {% endfor %}
       {% if day.entries|length > 6 %}
-      <a href="/timetable/day/{{ day.date }}" class="text-[10px] text-hub-accent">+{{ day.entries|length - 6 }} {{ t("more") }}</a>
+      <a href="/day/{{ day.date }}" class="text-[10px] text-hub-accent">+{{ day.entries|length - 6 }} {{ t("more") }}</a>
       {% endif %}
     </div>
   </div>
@@ -108,9 +109,9 @@
 
 {# Quick links #}
 <div class="mt-6 flex flex-wrap gap-3 text-sm">
-  <a href="/timetable/templates" class="text-hub-muted hover:text-hub-accent transition-colors">{{ t("templates") }}</a>
-  <a href="/timetable/activity" class="text-hub-muted hover:text-hub-accent transition-colors">{{ t("activity_log") }}</a>
-  <a href="/timetable/export.ics{% if selected_member %}?member={{ selected_member }}{% endif %}" class="text-hub-muted hover:text-hub-accent transition-colors">{{ t("export_ical") }}</a>
-  <a href="/timetable/colors" class="text-hub-muted hover:text-hub-accent transition-colors">{{ t("color_settings") }}</a>
+  <a href="/templates" class="text-hub-muted hover:text-hub-accent transition-colors">{{ t("templates") }}</a>
+  <a href="/activity" class="text-hub-muted hover:text-hub-accent transition-colors">{{ t("activity_log") }}</a>
+  <a href="/export.ics{% if selected_member %}?member={{ selected_member }}{% endif %}" class="text-hub-muted hover:text-hub-accent transition-colors">{{ t("export_ical") }}</a>
+  <a href="/colors" class="text-hub-muted hover:text-hub-accent transition-colors">{{ t("color_settings") }}</a>
 </div>
 {% endblock %}

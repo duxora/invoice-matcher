@@ -3,7 +3,7 @@
 
 {% block content %}
 <div class="mb-2">
-  <a href="/timetable/" class="text-hub-accent text-sm hover:underline">&larr; {{ t("back_to_week") }}</a>
+  <a href="/" class="text-hub-accent text-sm hover:underline">&larr; {{ t("back_to_week") }}</a>
 </div>
 
 <div class="mb-6 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
@@ -11,21 +11,21 @@
     <h1 class="text-2xl font-bold">{{ date_label }}</h1>
   </div>
   <div class="flex flex-wrap gap-2">
-    <a href="/timetable/add?date_str={{ date_str }}" class="btn btn-primary text-sm">+ {{ t("add_entry") }}</a>
-    <a href="/timetable/export.ics?weeks=1{% if selected_member %}&member={{ selected_member }}{% endif %}" class="btn btn-ghost text-sm">{{ t("export_ical") }}</a>
+    <a href="/add?date_str={{ date_str }}" class="btn btn-primary text-sm">+ {{ t("add_entry") }}</a>
+    <a href="/export.ics?weeks=1{% if selected_member %}&member={{ selected_member }}{% endif %}" class="btn btn-ghost text-sm">{{ t("export_ical") }}</a>
   </div>
 </div>
 
 {# Member filter #}
 <div class="flex flex-wrap gap-2 mb-4">
-  <a href="/timetable/day/{{ date_str }}"
+  <a href="/day/{{ date_str }}"
      class="px-3 py-1 rounded-full text-xs border transition-colors
             {% if not selected_member %}bg-hub-accent/20 border-hub-accent text-hub-accent{% else %}border-hub-border text-hub-muted hover:text-hub-text{% endif %}">
     {{ t("filter_all") }}
   </a>
   {% for member in family_members %}
   {% set color = get_member_color(member) %}
-  <a href="/timetable/day/{{ date_str }}?member={{ member }}"
+  <a href="/day/{{ date_str }}?member={{ member }}"
      class="px-3 py-1 rounded-full text-xs border transition-colors
             {% if selected_member == member %}{{ color.bg }} {{ color.border }} {{ color.text }}{% else %}border-hub-border text-hub-muted hover:text-hub-text{% endif %}">
     {{ member }}
@@ -106,14 +106,14 @@
         <div class="flex items-center gap-2 mt-2 pt-2 border-t border-white/10">
           {# Toggle complete #}
           {% if entry.get("_type") == "Tasks" %}
-          <form method="post" action="/timetable/toggle/Tasks/{{ entry._row_index }}" class="inline">
+          <form method="post" action="/toggle/Tasks/{{ entry._row_index }}" class="inline">
             <button type="submit" class="text-[10px] px-2 py-0.5 rounded border transition-colors
                     {% if is_done %}border-green-500/30 text-green-400 hover:bg-green-500/20{% else %}border-hub-border text-hub-muted hover:text-hub-text{% endif %}">
               {% if is_done %}{{ t("completed") }}{% else %}{{ t("mark_done") }}{% endif %}
             </button>
           </form>
           {% elif entry.get("_type") == "Reminders" %}
-          <form method="post" action="/timetable/toggle/Reminders/{{ entry._row_index }}" class="inline">
+          <form method="post" action="/toggle/Reminders/{{ entry._row_index }}" class="inline">
             <button type="submit" class="text-[10px] px-2 py-0.5 rounded border transition-colors
                     {% if is_done %}border-green-500/30 text-green-400 hover:bg-green-500/20{% else %}border-hub-border text-hub-muted hover:text-hub-text{% endif %}">
               {% if is_done %}{{ t("done") }}{% else %}{{ t("mark_done") }}{% endif %}
@@ -122,13 +122,13 @@
           {% endif %}
 
           {# Edit #}
-          <a href="/timetable/edit/{{ entry._type }}/{{ entry._row_index }}"
+          <a href="/edit/{{ entry._type }}/{{ entry._row_index }}"
              class="text-[10px] px-2 py-0.5 rounded border border-hub-border text-hub-muted hover:text-hub-text transition-colors">
             {{ t("edit") }}
           </a>
 
           {# Delete #}
-          <form method="post" action="/timetable/delete/{{ entry._type }}/{{ entry._row_index }}" class="inline"
+          <form method="post" action="/delete/{{ entry._type }}/{{ entry._row_index }}" class="inline"
                 onsubmit="return confirm('{{ t("confirm_delete") }}')">
             <button type="submit" class="text-[10px] px-2 py-0.5 rounded border border-red-500/30 text-red-400 hover:bg-red-500/20 transition-colors">
               {{ t("delete") }}

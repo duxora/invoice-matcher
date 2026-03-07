@@ -11,7 +11,7 @@ def client():
     from claude_scheduler.timetable.routes import router
 
     app = FastAPI()
-    app.include_router(router, prefix="/timetable")
+    app.include_router(router)
 
     yield TestClient(app)
 
@@ -33,48 +33,48 @@ def _setup_daily_mock(mock_svc):
 def test_weekly_view_returns_200(client):
     with patch("claude_scheduler.timetable.routes.get_service") as mock_svc:
         _setup_weekly_mock(mock_svc)
-        resp = client.get("/timetable/")
+        resp = client.get("/")
     assert resp.status_code == 200
 
 
 def test_weekly_view_with_week_param(client):
     with patch("claude_scheduler.timetable.routes.get_service") as mock_svc:
         _setup_weekly_mock(mock_svc)
-        resp = client.get("/timetable/?week=2026-03-09")
+        resp = client.get("/?week=2026-03-09")
     assert resp.status_code == 200
 
 
 def test_daily_view_returns_200(client):
     with patch("claude_scheduler.timetable.routes.get_service") as mock_svc:
         _setup_daily_mock(mock_svc)
-        resp = client.get("/timetable/day/2026-03-09")
+        resp = client.get("/day/2026-03-09")
     assert resp.status_code == 200
 
 
 def test_add_form_returns_200(client):
-    resp = client.get("/timetable/add")
+    resp = client.get("/add")
     assert resp.status_code == 200
 
 
 def test_add_form_with_date_param(client):
-    resp = client.get("/timetable/add?date_str=2026-03-09&sheet=Study")
+    resp = client.get("/add?date_str=2026-03-09&sheet=Study")
     assert resp.status_code == 200
 
 
 def test_add_entry_redirects(client):
     with patch("claude_scheduler.timetable.routes.get_service") as mock_svc:
-        resp = client.post("/timetable/add", data={
+        resp = client.post("/add", data={
             "sheet": "Tasks", "date": "2026-03-09", "time": "09:00",
             "person": "Duc", "title": "Test task",
         }, follow_redirects=False)
     assert resp.status_code == 303
-    assert "/timetable/day/2026-03-09" in resp.headers["location"]
+    assert "/day/2026-03-09" in resp.headers["location"]
     mock_svc.return_value.sheets.append_row.assert_called_once()
 
 
 def test_add_entry_study_sheet(client):
     with patch("claude_scheduler.timetable.routes.get_service") as mock_svc:
-        resp = client.post("/timetable/add", data={
+        resp = client.post("/add", data={
             "sheet": "Study", "date": "2026-03-09", "time": "10:00",
             "person": "Child1", "subject": "Math", "topic": "Algebra",
             "entry_type": "class",
@@ -87,7 +87,7 @@ def test_add_entry_study_sheet(client):
 
 def test_add_entry_events_sheet(client):
     with patch("claude_scheduler.timetable.routes.get_service") as mock_svc:
-        resp = client.post("/timetable/add", data={
+        resp = client.post("/add", data={
             "sheet": "Events", "date": "2026-03-09", "time": "14:00",
             "end_time": "16:00", "title": "Birthday party",
             "participants": "Family",

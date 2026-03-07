@@ -291,7 +291,7 @@ def route_client():
     from fastapi import FastAPI
     from fastapi.testclient import TestClient
     app = FastAPI()
-    app.include_router(router, prefix="/timetable")
+    app.include_router(router)
     yield TestClient(app)
 
 
@@ -301,20 +301,20 @@ def test_edit_form(route_client):
             "Date": "2026-03-09", "Time": "09:00", "Person": "Duc",
             "Title": "Test", "Description": "", "Status": "pending", "Recurring": ""
         }
-        resp = route_client.get("/timetable/edit/Tasks/0")
+        resp = route_client.get("/edit/Tasks/0")
     assert resp.status_code == 200
 
 
 def test_edit_form_missing_entry(route_client):
     with patch("claude_scheduler.timetable.routes.get_service") as mock:
         mock.return_value.get_entry.return_value = {}
-        resp = route_client.get("/timetable/edit/Tasks/99", follow_redirects=False)
+        resp = route_client.get("/edit/Tasks/99", follow_redirects=False)
     assert resp.status_code == 303
 
 
 def test_save_edit(route_client):
     with patch("claude_scheduler.timetable.routes.get_service") as mock:
-        resp = route_client.post("/timetable/edit/Tasks/0", data={
+        resp = route_client.post("/edit/Tasks/0", data={
             "date": "2026-03-09", "time": "10:00", "person": "Duc",
             "title": "Updated", "status": "done",
         }, follow_redirects=False)
@@ -325,38 +325,38 @@ def test_save_edit(route_client):
 def test_delete_entry_route(route_client):
     with patch("claude_scheduler.timetable.routes.get_service") as mock:
         mock.return_value.delete_entry.return_value = {"Date": "2026-03-09"}
-        resp = route_client.post("/timetable/delete/Tasks/0", follow_redirects=False)
+        resp = route_client.post("/delete/Tasks/0", follow_redirects=False)
     assert resp.status_code == 303
 
 
 def test_toggle_task_route(route_client):
     with patch("claude_scheduler.timetable.routes.get_service") as mock:
         mock.return_value.toggle_task_status.return_value = "done"
-        resp = route_client.post("/timetable/toggle/Tasks/0", follow_redirects=False)
+        resp = route_client.post("/toggle/Tasks/0", follow_redirects=False)
     assert resp.status_code == 303
 
 
 def test_toggle_reminder_route(route_client):
     with patch("claude_scheduler.timetable.routes.get_service") as mock:
         mock.return_value.toggle_reminder_done.return_value = "yes"
-        resp = route_client.post("/timetable/toggle/Reminders/0", follow_redirects=False)
+        resp = route_client.post("/toggle/Reminders/0", follow_redirects=False)
     assert resp.status_code == 303
 
 
 def test_activity_log_page(route_client):
     with patch("claude_scheduler.timetable.routes.get_activity_log", return_value=[]):
-        resp = route_client.get("/timetable/activity")
+        resp = route_client.get("/activity")
     assert resp.status_code == 200
 
 
 def test_templates_page(route_client):
-    resp = route_client.get("/timetable/templates")
+    resp = route_client.get("/templates")
     assert resp.status_code == 200
 
 
 def test_apply_template(route_client):
     with patch("claude_scheduler.timetable.routes.get_service") as mock:
-        resp = route_client.post("/timetable/apply-template", data={
+        resp = route_client.post("/apply-template", data={
             "template_id": "school_week",
             "person": "Child1",
             "start_date": "2026-03-09",
@@ -371,7 +371,7 @@ def test_ical_export(route_client):
         mock.return_value.get_all_entries_for_range.return_value = [
             {"Date": "2026-03-09", "Time": "09:00", "Title": "Test", "_type": "Tasks"},
         ]
-        resp = route_client.get("/timetable/export.ics")
+        resp = route_client.get("/export.ics")
     assert resp.status_code == 200
     assert "BEGIN:VCALENDAR" in resp.text
     assert resp.headers["content-type"] == "text/calendar; charset=utf-8"
@@ -380,12 +380,12 @@ def test_ical_export(route_client):
 def test_ical_export_member_filter(route_client):
     with patch("claude_scheduler.timetable.routes.get_service") as mock:
         mock.return_value.get_all_entries_for_range.return_value = []
-        resp = route_client.get("/timetable/export.ics?member=Duc")
+        resp = route_client.get("/export.ics?member=Duc")
     assert resp.status_code == 200
 
 
 def test_colors_page(route_client):
-    resp = route_client.get("/timetable/colors")
+    resp = route_client.get("/colors")
     assert resp.status_code == 200
 
 
@@ -395,7 +395,7 @@ def test_weekly_with_member_filter(route_client):
         mock.return_value.get_pending_reminders.return_value = []
         mock.return_value.get_overdue_items.return_value = []
         mock.return_value.detect_conflicts.return_value = []
-        resp = route_client.get("/timetable/?member=Duc")
+        resp = route_client.get("/?member=Duc")
     assert resp.status_code == 200
 
 
@@ -404,7 +404,7 @@ def test_daily_with_member_filter(route_client):
         mock.return_value.get_daily_agenda.return_value = {"Duc": []}
         mock.return_value.get_pending_reminders.return_value = []
         mock.return_value.detect_conflicts.return_value = []
-        resp = route_client.get("/timetable/day/2026-03-09?member=Duc")
+        resp = route_client.get("/day/2026-03-09?member=Duc")
     assert resp.status_code == 200
 
 
@@ -443,3 +443,54 @@ def test_deadline_info_empty():
     from claude_scheduler.timetable.routes import deadline_info
     assert deadline_info({}) == {}
     assert deadline_info({"Deadline": ""}) == {}
+
+
+# --- Month view ---
+
+def test_month_data_service():
+    from claude_scheduler.timetable.service import TimetableService
+    mock_sheets = MagicMock()
+    mock_sheets.fetch_by_date_range.side_effect = lambda sheet, start, end: [
+        {"Date": "2026-03-10", "Time": "09:00", "Person": "Duc", "Title": "Task 1"},
+        {"Date": "2026-03-10", "Time": "14:00", "Person": "Wife", "Title": "Task 2"},
+        {"Date": "2026-03-15", "Time": "10:00", "Person": "Duc", "Title": "Task 3"},
+    ] if sheet == "Tasks" else []
+    svc = TimetableService(mock_sheets, family_members=["Duc", "Wife"])
+    result = svc.get_month_data(2026, 3)
+    assert "2026-03-10" in result
+    assert len(result["2026-03-10"]) == 2
+    assert "2026-03-15" in result
+
+
+def test_month_data_service_member_filter():
+    from claude_scheduler.timetable.service import TimetableService
+    mock_sheets = MagicMock()
+    mock_sheets.fetch_by_date_range.side_effect = lambda sheet, start, end: [
+        {"Date": "2026-03-10", "Time": "09:00", "Person": "Duc", "Title": "Task 1"},
+        {"Date": "2026-03-10", "Time": "14:00", "Person": "Wife", "Title": "Task 2"},
+    ] if sheet == "Tasks" else []
+    svc = TimetableService(mock_sheets, family_members=["Duc", "Wife"])
+    result = svc.get_month_data(2026, 3, member="Duc")
+    assert len(result.get("2026-03-10", [])) == 1
+    assert result["2026-03-10"][0]["Person"] == "Duc"
+
+
+def test_month_view_route(route_client):
+    with patch("claude_scheduler.timetable.routes.get_service") as mock:
+        mock.return_value.get_month_data.return_value = {}
+        resp = route_client.get("/month/2026/3")
+    assert resp.status_code == 200
+    assert "March 2026" in resp.text or "2026" in resp.text
+
+
+def test_month_view_redirect(route_client):
+    resp = route_client.get("/month", follow_redirects=False)
+    assert resp.status_code == 307
+    assert "/month/" in resp.headers["location"]
+
+
+def test_month_view_with_member_filter(route_client):
+    with patch("claude_scheduler.timetable.routes.get_service") as mock:
+        mock.return_value.get_month_data.return_value = {}
+        resp = route_client.get("/month/2026/3?member=Duc")
+    assert resp.status_code == 200

@@ -1,0 +1,77 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>{% block title %}Family Timetable{% endblock %}</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          colors: {
+            hub: {
+              bg: '#0f172a',
+              sidebar: '#1e293b',
+              card: '#1e293b',
+              border: '#334155',
+              text: '#e2e8f0',
+              muted: '#94a3b8',
+              accent: '#38bdf8',
+            }
+          }
+        }
+      }
+    }
+  </script>
+  <script src="https://unpkg.com/htmx.org@2.0.4"></script>
+</head>
+<body class="bg-hub-bg text-hub-text min-h-screen flex">
+  <!-- Sidebar -->
+  <aside class="w-48 bg-hub-sidebar border-r border-hub-border flex flex-col fixed h-full hidden sm:flex">
+    <a href="/" class="block px-4 py-3 text-base font-bold border-b border-hub-border hover:text-hub-accent transition-colors">
+      📅 Timetable
+    </a>
+    <nav class="flex-1 py-3 overflow-y-auto">
+      <a href="/" class="block px-4 py-1.5 text-xs transition-colors
+        {% if request.url.path == '/' %}text-hub-accent{% else %}text-hub-muted hover:text-hub-text{% endif %}">
+        Week View
+      </a>
+      <a href="/month" class="block px-4 py-1.5 text-xs transition-colors
+        {% if '/month' in request.url.path %}text-hub-accent{% else %}text-hub-muted hover:text-hub-text{% endif %}">
+        Month View
+      </a>
+      <a href="/templates" class="block px-4 py-1.5 text-xs transition-colors
+        {% if request.url.path == '/templates' %}text-hub-accent{% else %}text-hub-muted hover:text-hub-text{% endif %}">
+        Templates
+      </a>
+      <a href="/activity" class="block px-4 py-1.5 text-xs transition-colors
+        {% if request.url.path == '/activity' %}text-hub-accent{% else %}text-hub-muted hover:text-hub-text{% endif %}">
+        Activity
+      </a>
+      <a href="/colors" class="block px-4 py-1.5 text-xs transition-colors
+        {% if request.url.path == '/colors' %}text-hub-accent{% else %}text-hub-muted hover:text-hub-text{% endif %}">
+        Colors
+      </a>
+      <a href="/export.ics" class="block px-4 py-1.5 text-xs text-hub-muted hover:text-hub-text transition-colors">
+        Export iCal
+      </a>
+    </nav>
+  </aside>
+
+  <!-- Mobile nav -->
+  <div class="sm:hidden fixed top-0 left-0 right-0 z-10 bg-hub-sidebar border-b border-hub-border px-3 py-2 flex items-center justify-between">
+    <span class="font-bold text-sm">📅 Timetable</span>
+    <div class="flex gap-2 text-xs">
+      <a href="/" class="text-hub-muted hover:text-hub-accent">Week</a>
+      <a href="/month" class="text-hub-muted hover:text-hub-accent">Month</a>
+      <a href="/add" class="text-hub-accent">+ Add</a>
+    </div>
+  </div>
+
+  <!-- Main content -->
+  <main class="sm:ml-48 flex-1 p-4 sm:p-6 min-h-screen mt-10 sm:mt-0">
+    {% block content %}{% endblock %}
+  </main>
+</body>
+</html>

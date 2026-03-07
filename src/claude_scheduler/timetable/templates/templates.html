@@ -3,7 +3,7 @@
 
 {% block content %}
 <div class="mb-2">
-  <a href="/timetable/" class="text-hub-accent text-sm hover:underline">&larr; {{ t("back_to_week") }}</a>
+  <a href="/" class="text-hub-accent text-sm hover:underline">&larr; {{ t("back_to_week") }}</a>
 </div>
 
 <div class="mb-6">
@@ -18,7 +18,7 @@
     <p class="text-sm text-hub-muted mb-3">{{ tpl.description }}</p>
     <p class="text-xs text-hub-muted mb-4">{{ tpl.entry_count }} entries</p>
 
-    <form method="post" action="/timetable/apply-template" class="space-y-3">
+    <form method="post" action="/apply-template" class="space-y-3">
       <input type="hidden" name="template_id" value="{{ tpl.id }}">
       <div class="grid grid-cols-2 gap-2">
         <div>

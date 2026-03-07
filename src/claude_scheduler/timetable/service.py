@@ -1,4 +1,5 @@
 """Timetable data service -- aggregates sheets data for views."""
+import calendar
 from collections import defaultdict
 from datetime import date, timedelta
 from typing import Any
@@ -21,6 +22,27 @@ class TimetableService:
         for sheet_name in ("Tasks", "Study", "Reminders", "Events"):
             records = self.sheets.fetch_by_date_range(
                 sheet_name, start.isoformat(), end.isoformat()
+            )
+            for r in records:
+                r["_type"] = sheet_name
+                if member and r.get("Person", r.get("Participants", "")) != member:
+                    continue
+                result[r.get("Date", "")].append(r)
+
+        for d in result:
+            result[d].sort(key=lambda r: r.get("Time", r.get("Start Time", "")))
+
+        return dict(result)
+
+    def get_month_data(self, year: int, month: int, member: str = "") -> dict[str, list[dict]]:
+        """Get all entries for a month, grouped by date string."""
+        first_day = date(year, month, 1)
+        last_day = date(year, month, calendar.monthrange(year, month)[1])
+
+        result: dict[str, list[dict]] = defaultdict(list)
+        for sheet_name in ("Tasks", "Study", "Reminders", "Events"):
+            records = self.sheets.fetch_by_date_range(
+                sheet_name, first_day.isoformat(), last_day.isoformat()
             )
             for r in records:
                 r["_type"] = sheet_name

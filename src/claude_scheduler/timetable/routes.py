@@ -1,10 +1,10 @@
-"""Timetable web routes -- weekly view, daily view, add/edit entries, templates, iCal."""
+"""Timetable web routes -- weekly, daily, monthly views, add/edit entries, templates, iCal."""
+import calendar
 import os
 from datetime import date, timedelta
 from fastapi import APIRouter, Form, Query, Request
 from fastapi.responses import HTMLResponse, RedirectResponse, Response  # noqa: F811
 from fastapi.templating import Jinja2Templates
-from jinja2 import ChoiceLoader, FileSystemLoader
 from pathlib import Path
 
 from claude_scheduler.timetable.sheets import SheetsClient, get_activity_log
@@ -18,12 +18,7 @@ from claude_scheduler.timetable.schedule_templates import (
 router = APIRouter()
 
 _TEMPLATES_DIR = Path(__file__).parent / "templates"
-_loader = ChoiceLoader([
-    FileSystemLoader(str(_TEMPLATES_DIR)),
-    FileSystemLoader(str(Path(__file__).parent.parent / "web" / "templates")),
-])
 templates = Jinja2Templates(directory=str(_TEMPLATES_DIR))
-templates.env.loader = _loader
 
 FAMILY_MEMBERS = [
     m.strip() for m in os.environ.get("FAMILY_MEMBERS", "Duc,Wife,Child1,Child2,Child3").split(",")
@@ -70,7 +65,6 @@ def _reset_service():
 
 
 def app_context(request: Request, **kwargs):
-    from claude_scheduler.web.app import APPS
     user = None
     try:
         user = getattr(request.state, "user", None)
@@ -85,7 +79,7 @@ def app_context(request: Request, **kwargs):
     lang = request.query_params.get("lang", os.environ.get("TIMETABLE_LANG", "vi"))
     t = get_translator(lang)
 
-    return {"request": request, "apps": APPS, "user": user,
+    return {"request": request, "user": user,
             "family_members": FAMILY_MEMBERS, "t": t, "lang": lang, **kwargs}
 
 
@@ -203,6 +197,72 @@ async def daily_view(request: Request, date_str: str, member: str = ""):
     ))
 
 
+# --- Month View ---
+@router.get("/month/{year}/{month}", response_class=HTMLResponse)
+async def monthly_view(request: Request, year: int, month: int, member: str = ""):
+    svc = get_service()
+    try:
+        month_data = svc.get_month_data(year, month, member=member)
+    except Exception as e:
+        _reset_service()
+        from claude_scheduler.timetable.auth import _setup_error_html
+        return HTMLResponse(content=_setup_error_html(str(e)))
+
+    today = date.today()
+    first_day = date(year, month, 1)
+    _, days_in_month = calendar.monthrange(year, month)
+
+    # Build calendar weeks (list of 7-day rows)
+    # Start from Monday of the week containing the 1st
+    start_weekday = first_day.weekday()  # 0=Mon
+    cal_start = first_day - timedelta(days=start_weekday)
+
+    weeks = []
+    current = cal_start
+    while current <= date(year, month, days_in_month) or current.weekday() != 0:
+        week = []
+        for _ in range(7):
+            ds = current.isoformat()
+            week.append({
+                "date": ds,
+                "day": current.day,
+                "in_month": current.month == month,
+                "is_today": current == today,
+                "entries": month_data.get(ds, []),
+            })
+            current += timedelta(days=1)
+        weeks.append(week)
+        if current.month != month and current.weekday() == 0:
+            break
+
+    # Prev/next month
+    if month == 1:
+        prev_year, prev_month = year - 1, 12
+    else:
+        prev_year, prev_month = year, month - 1
+    if month == 12:
+        next_year, next_month = year + 1, 1
+    else:
+        next_year, next_month = year, month + 1
+
+    month_label = first_day.strftime("%B %Y")
+
+    return templates.TemplateResponse("monthly.html", app_context(
+        request, weeks=weeks, year=year, month=month,
+        month_label=month_label,
+        prev_year=prev_year, prev_month=prev_month,
+        next_year=next_year, next_month=next_month,
+        get_member_color=get_member_color,
+        selected_member=member,
+    ))
+
+
+@router.get("/month", response_class=HTMLResponse)
+async def monthly_view_current(request: Request, member: str = ""):
+    today = date.today()
+    return RedirectResponse(url=f"/month/{today.year}/{today.month}{'?member=' + member if member else ''}", status_code=307)
+
+
 # --- Add Entry ---
 @router.get("/add", response_class=HTMLResponse)
 async def add_form(request: Request, sheet: str = "Tasks", date_str: str = ""):
@@ -250,7 +310,7 @@ async def add_entry(
                       "Description": description, "Participants": participants})
 
     svc.sheets.append_row(sheet, data)
-    return RedirectResponse(url=f"/timetable/day/{entry_date}", status_code=303)
+    return RedirectResponse(url=f"/day/{entry_date}", status_code=303)
 
 
 # --- Edit Entry ---
@@ -259,7 +319,7 @@ async def edit_form(request: Request, sheet: str, row_index: int):
     svc = get_service()
     entry = svc.get_entry(sheet, row_index)
     if not entry:
-        return RedirectResponse(url="/timetable/", status_code=303)
+        return RedirectResponse(url="/", status_code=303)
     return templates.TemplateResponse("edit_entry.html", app_context(
         request, sheet=sheet, row_index=row_index, entry=entry,
         sheets=["Tasks", "Study", "Reminders", "Events"],
@@ -304,7 +364,7 @@ async def save_edit(
                       "Description": description, "Participants": participants})
 
     svc.update_entry(sheet, row_index, data)
-    return RedirectResponse(url=f"/timetable/day/{entry_date}", status_code=303)
+    return RedirectResponse(url=f"/day/{entry_date}", status_code=303)
 
 
 # --- Delete Entry ---
@@ -321,7 +381,7 @@ async def delete_entry(request: Request, sheet: str, row_index: int):
 async def toggle_task(request: Request, row_index: int):
     svc = get_service()
     svc.toggle_task_status(row_index)
-    referer = request.headers.get("referer", "/timetable/")
+    referer = request.headers.get("referer", "/")
     return RedirectResponse(url=referer, status_code=303)
 
 
@@ -329,7 +389,7 @@ async def toggle_task(request: Request, row_index: int):
 async def toggle_reminder(request: Request, row_index: int):
     svc = get_service()
     svc.toggle_reminder_done(row_index)
-    referer = request.headers.get("referer", "/timetable/")
+    referer = request.headers.get("referer", "/")
     return RedirectResponse(url=referer, status_code=303)
 
 
@@ -369,7 +429,7 @@ async def apply_template(
     for entry in entries:
         sheet = get_sheet_for_entry(entry)
         svc.sheets.append_row(sheet, entry)
-    return RedirectResponse(url=f"/timetable/?week={start_date}", status_code=303)
+    return RedirectResponse(url=f"/?week={start_date}", status_code=303)
 
 
 # --- Recurring Generation ---
@@ -377,7 +437,7 @@ async def apply_template(
 async def generate_recurring(request: Request, weeks: int = Form(1)):
     svc = get_service()
     count = svc.generate_recurring(date.today().isoformat(), weeks=weeks)
-    return RedirectResponse(url="/timetable/", status_code=303)
+    return RedirectResponse(url="/", status_code=303)
 
 
 # --- iCal Export ---

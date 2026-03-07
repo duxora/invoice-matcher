@@ -3,7 +3,7 @@
 
 {% block content %}
 <div class="mb-2">
-  <a href="/timetable/day/{{ entry.get('Date', '') }}" class="text-hub-accent text-sm hover:underline">&larr; {{ t("back") }}</a>
+  <a href="/day/{{ entry.get('Date', '') }}" class="text-hub-accent text-sm hover:underline">&larr; {{ t("back") }}</a>
 </div>
 
 <div class="mb-6">
@@ -11,7 +11,7 @@
 </div>
 
 <div class="bg-hub-card border border-hub-border rounded-lg p-6 max-w-2xl">
-  <form method="post" action="/timetable/edit/{{ sheet }}/{{ row_index }}" class="space-y-4">
+  <form method="post" action="/edit/{{ sheet }}/{{ row_index }}" class="space-y-4">
     <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
       <div>
         <label class="block text-sm font-medium mb-1">{{ t("type") }}</label>
@@ -164,7 +164,7 @@
 
     <div class="flex items-center gap-3 pt-2">
       <button type="submit" class="btn btn-primary px-6 py-2">{{ t("save") }}</button>
-      <a href="/timetable/day/{{ entry.get('Date', '') }}" class="btn btn-ghost">{{ t("cancel") }}</a>
+      <a href="/day/{{ entry.get('Date', '') }}" class="btn btn-ghost">{{ t("cancel") }}</a>
     </div>
   </form>
 </div>

@@ -58,9 +58,5 @@ from claude_scheduler.web.routes import router as scheduler_router
 register_app("Scheduler", "Claude task scheduler dashboard", "/scheduler", icon="⚙️")
 app.include_router(scheduler_router, prefix="/scheduler")
 
-from claude_scheduler.timetable.routes import router as timetable_router
-from claude_scheduler.timetable.auth import auth_router, require_auth
-app.include_router(auth_router)
-app.middleware("http")(require_auth)
-register_app("Timetable", "Family timetable & study planner", "/timetable", icon="📅")
-app.include_router(timetable_router, prefix="/timetable")
+# Timetable is a standalone app: run with
+# uvicorn claude_scheduler.timetable.app:app --port 7070

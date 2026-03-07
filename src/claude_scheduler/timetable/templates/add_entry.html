@@ -3,7 +3,7 @@
 
 {% block content %}
 <div class="mb-2">
-  <a href="/timetable/" class="text-hub-accent text-sm hover:underline">&larr; {{ t("back") }}</a>
+  <a href="/" class="text-hub-accent text-sm hover:underline">&larr; {{ t("back") }}</a>
 </div>
 
 <div class="mb-6">
@@ -11,7 +11,7 @@
 </div>
 
 <div class="bg-hub-card border border-hub-border rounded-lg p-6 max-w-2xl">
-  <form method="post" action="/timetable/add" class="space-y-4" id="add-form">
+  <form method="post" action="/add" class="space-y-4" id="add-form">
     <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
       <div>
         <label for="sheet" class="block text-sm font-medium mb-1">{{ t("type") }} *</label>
@@ -126,7 +126,7 @@
 
     <div class="flex items-center gap-3 pt-2">
       <button type="submit" class="btn btn-primary px-6 py-2">{{ t("add_entry") }}</button>
-      <a href="/timetable/" class="btn btn-ghost">{{ t("cancel") }}</a>
+      <a href="/" class="btn btn-ghost">{{ t("cancel") }}</a>
     </div>
   </form>
 </div>

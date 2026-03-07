@@ -74,6 +74,8 @@ TRANSLATIONS = {
         "choose_color": "Choose Color",
         "conflicts": "Schedule Conflicts",
         "conflict_warning": "Time conflict detected",
+        "month_view": "Month View",
+        "back_to_month": "Back to Month",
         # Day names
         "mon": "Mon", "tue": "Tue", "wed": "Wed", "thu": "Thu",
         "fri": "Fri", "sat": "Sat", "sun": "Sun",
@@ -150,6 +152,8 @@ TRANSLATIONS = {
         "choose_color": "Chon mau",
         "conflicts": "Trung lich",
         "conflict_warning": "Phat hien trung gio",
+        "month_view": "Xem Thang",
+        "back_to_month": "Quay lai Thang",
         # Day names
         "mon": "T2", "tue": "T3", "wed": "T4", "thu": "T5",
         "fri": "T6", "sat": "T7", "sun": "CN",

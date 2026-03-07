@@ -119,7 +119,7 @@ async def auth_callback(request: Request):
         "name": userinfo.get("name", email),
         "picture": userinfo.get("picture", ""),
     }
-    return RedirectResponse(url="/timetable/")
+    return RedirectResponse(url="/")
 
 
 @auth_router.get("/logout")
