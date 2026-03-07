@@ -427,6 +427,236 @@ def cmd_gateway_policy_list(args):
         ))
 
 
+# ── Debate ──
+
+def cmd_debate(args):
+    from apps.socratic_bot.debate import DebateSession
+    from apps.socratic_bot.scorer import build_scoring_prompt, parse_score
+    import subprocess, json
+
+    mode = args.mode or "socratic"
+    topic = args.topic or ""
+    session = DebateSession(mode=mode)
+
+    console.print(f"[bold]Debate mode: {mode}[/bold]")
+    if topic:
+        console.print(f"[dim]Topic: {topic}[/dim]")
+    console.print("[dim]Type 'quit' to end, 'score' to get scored[/dim]\n")
+
+    if topic:
+        response = session.send(topic)
+        console.print(f"[cyan]Bot:[/cyan] {response}\n")
+
+    while True:
+        try:
+            user_input = input("You: ").strip()
+        except (EOFError, KeyboardInterrupt):
+            break
+        if not user_input:
+            continue
+        if user_input.lower() == "quit":
+            break
+        if user_input.lower() == "score":
+            prompt = build_scoring_prompt(session.history)
+            cmd = ["claude", "-p", prompt, "--output-format", "json"]
+            proc = subprocess.run(cmd, capture_output=True, timeout=120)
+            score = parse_score(proc.stdout.decode(errors="replace"))
+            console.print(Panel(
+                f"Logic: {score.get('logic', 0)}/5\n"
+                f"Evidence: {score.get('evidence', 0)}/5\n"
+                f"Counterarguments: {score.get('counterarguments', 0)}/5\n"
+                f"Clarity: {score.get('clarity', 0)}/5\n"
+                f"Overall: {score.get('overall', 0)}/5\n"
+                f"Feedback: {score.get('feedback', '')}",
+                title="Argument Score",
+            ))
+            continue
+        response = session.send(user_input)
+        console.print(f"\n[cyan]Bot:[/cyan] {response}\n")
+
+    summary = session.summary()
+    console.print(f"\n[dim]Session: {summary['turns']} turns, mode: {summary['mode']}[/dim]")
+
+
+# ── Journal ──
+
+def cmd_journal(args):
+    from claude_scheduler.journal.daily import get_daily_prompt
+    from claude_scheduler.journal.reviewer import build_review_prompt
+    from claude_scheduler.journal.tracker import JournalTracker
+    import os, subprocess, tempfile, json
+    from datetime import date
+
+    cfg = get_config()
+    tracker = JournalTracker(cfg.paths.data_dir / "journal.db")
+
+    prompt = get_daily_prompt()
+    console.print(Panel(prompt, title="Today's Prompt"))
+    console.print("[dim]Opening editor... Write 200-500 words, then save and close.[/dim]\n")
+
+    with tempfile.NamedTemporaryFile(mode="w", suffix=".md", delete=False) as f:
+        f.write(f"# Journal Entry - {date.today()}\n\nPrompt: {prompt}\n\n---\n\n")
+        tmp_path = f.name
+
+    editor = os.environ.get("EDITOR", "vim")
+    subprocess.call([editor, tmp_path])
+
+    text = Path(tmp_path).read_text()
+    # Extract just the user's writing (after the ---)
+    if "---" in text:
+        text = text.split("---", 1)[1].strip()
+
+    if len(text) < 10:
+        console.print("[red]Entry too short. Skipping review.[/red]")
+        Path(tmp_path).unlink()
+        return
+
+    word_count = len(text.split())
+    console.print(f"[green]Written: {word_count} words[/green]")
+    console.print("[dim]Reviewing with Claude...[/dim]")
+
+    review_prompt = build_review_prompt(text)
+    cmd = ["claude", "-p", review_prompt, "--output-format", "json"]
+    proc = subprocess.run(cmd, capture_output=True, timeout=120)
+
+    try:
+        data = json.loads(proc.stdout.decode(errors="replace"))
+        review = json.loads(data.get("result", "{}")) if isinstance(data.get("result"), str) else data
+    except (json.JSONDecodeError, TypeError):
+        review = {}
+
+    if review:
+        console.print(Panel(
+            f"Grammar: {review.get('grammar_score', '?')}/5\n"
+            f"Vocabulary: {review.get('vocabulary_score', '?')}/5\n"
+            f"Reasoning: {review.get('reasoning_score', '?')}/5\n"
+            f"Feedback: {review.get('overall_feedback', 'N/A')}",
+            title="Review",
+        ))
+        tracker.record_session(
+            str(date.today()), prompt, text,
+            review.get("grammar_score", 0),
+            review.get("vocabulary_score", 0),
+            review.get("reasoning_score", 0),
+            word_count,
+        )
+
+    Path(tmp_path).unlink(missing_ok=True)
+
+def cmd_journal_stats(args):
+    from claude_scheduler.journal.tracker import JournalTracker
+    cfg = get_config()
+    tracker = JournalTracker(cfg.paths.data_dir / "journal.db")
+    stats = tracker.get_stats()
+    streak = tracker.get_streak()
+    t = Table(show_header=False, box=None, title="Journal Stats")
+    t.add_row("[bold]Total sessions[/bold]", str(stats["total_sessions"]))
+    t.add_row("[bold]Avg grammar[/bold]", f"{stats['avg_grammar']}/5")
+    t.add_row("[bold]Avg vocabulary[/bold]", f"{stats['avg_vocab']}/5")
+    t.add_row("[bold]Avg reasoning[/bold]", f"{stats['avg_reasoning']}/5")
+    t.add_row("[bold]Avg words[/bold]", str(stats["avg_words"]))
+    t.add_row("[bold]Current streak[/bold]", f"{streak} days")
+    console.print(t)
+
+def cmd_journal_streak(args):
+    from claude_scheduler.journal.tracker import JournalTracker
+    cfg = get_config()
+    tracker = JournalTracker(cfg.paths.data_dir / "journal.db")
+    streak = tracker.get_streak()
+    if streak > 0:
+        console.print(f"[green]Current streak: {streak} day{'s' if streak != 1 else ''}[/green]")
+    else:
+        console.print("[dim]No streak. Start journaling today![/dim]")
+
+
+# ── Speaking Coach ──
+
+def cmd_speak(args):
+    from apps.speaking_coach.session import SpeakingSession
+    scenario = args.scenario or "free"
+    session = SpeakingSession(scenario=scenario)
+    opening = session.get_opening()
+    console.print(f"[bold]Scenario: {session.scenario_info['name']}[/bold]")
+    console.print(f"\n[cyan]Coach:[/cyan] {opening}\n")
+    console.print("[dim]Type 'quit' to end session[/dim]\n")
+
+    while True:
+        try:
+            user_input = input("You: ").strip()
+        except (EOFError, KeyboardInterrupt):
+            break
+        if not user_input or user_input.lower() == "quit":
+            break
+        ev = session.evaluate_response(user_input)
+        if ev.get("natural_response"):
+            console.print(f"\n[cyan]Coach:[/cyan] {ev['natural_response']}")
+        if ev.get("grammar_corrections"):
+            console.print(f"[yellow]Corrections:[/yellow] {', '.join(ev['grammar_corrections'])}")
+        if ev.get("tip"):
+            console.print(f"[green]Tip:[/green] {ev['tip']}\n")
+
+    summary = session.get_summary()
+    if summary.get("turns", 0) > 0:
+        console.print(Panel(
+            f"Turns: {summary['turns']}\n"
+            f"Grammar: {summary['avg_grammar']}/5\n"
+            f"Vocabulary: {summary['avg_vocabulary']}/5\n"
+            f"Fluency: {summary['avg_fluency']}/5",
+            title="Session Summary",
+        ))
+
+def cmd_speak_progress(args):
+    from apps.speaking_coach.progress import SpeakingTracker
+    cfg = get_config()
+    tracker = SpeakingTracker(cfg.paths.data_dir / "speaking.db")
+    progress = tracker.get_progress()
+    t = Table(show_header=False, box=None, title="Speaking Progress")
+    t.add_row("[bold]Total sessions[/bold]", str(progress["total_sessions"]))
+    t.add_row("[bold]Total turns[/bold]", str(progress["total_turns"]))
+    t.add_row("[bold]Avg grammar[/bold]", f"{progress['avg_grammar']}/5")
+    t.add_row("[bold]Avg vocabulary[/bold]", f"{progress['avg_vocabulary']}/5")
+    t.add_row("[bold]Avg fluency[/bold]", f"{progress['avg_fluency']}/5")
+    t.add_row("[bold]Avg overall[/bold]", f"{progress['avg_overall']}/5")
+    console.print(t)
+
+
+# ── Knowledge Base ──
+
+def cmd_kb_search(args):
+    from apps.knowledge_base.search import VaultSearch
+    cfg = get_config()
+    search = VaultSearch(cfg.paths.data_dir / "kb_index.db")
+    results = search.search(args.query)
+    if not results:
+        console.print("[dim]No results found.[/dim]")
+        return
+    for r in results:
+        console.print(f"[bold]{r['title']}[/bold] ({r['path']})")
+        if r.get("snippet"):
+            console.print(f"  {r['snippet'][:200]}")
+        console.print()
+
+def cmd_kb_reindex(args):
+    from apps.knowledge_base.indexer import VaultIndexer
+    cfg = get_config()
+    vault_path = args.vault or str(Path.home() / "Documents" / "Obsidian")
+    indexer = VaultIndexer(cfg.paths.data_dir / "kb_index.db")
+    stats = indexer.index_vault(Path(vault_path))
+    console.print(f"[green]Indexed: {stats['indexed']}, Skipped: {stats['skipped']}, Errors: {stats['errors']}[/green]")
+
+def cmd_kb_ask(args):
+    from apps.knowledge_base.search import VaultSearch
+    from apps.knowledge_base.synthesizer import synthesize
+    cfg = get_config()
+    search = VaultSearch(cfg.paths.data_dir / "kb_index.db")
+    results = search.search(args.question, limit=5)
+    if not results:
+        console.print("[dim]No relevant notes found.[/dim]")
+        return
+    answer = synthesize(args.question, results)
+    console.print(Panel(answer, title="Answer"))
+
+
 # ── Argument parser ──
 
 def main():
@@ -566,6 +796,58 @@ def main():
 
     p = gw_sub.add_parser("policy", help="List policies")
     p.set_defaults(func=cmd_gateway_policy_list)
+
+    # debate
+    p = sub.add_parser("debate", help="Socratic debate bot")
+    p.add_argument("--mode", "-m", choices=["socratic", "devil", "steelman"], default="socratic")
+    p.add_argument("--topic", "-t")
+    p.set_defaults(func=cmd_debate)
+
+    # journal
+    j_parser = sub.add_parser("journal", help="Daily reflection journal")
+    j_sub = j_parser.add_subparsers(dest="j_command")
+
+    p = j_sub.add_parser("write", help="Write today's entry")
+    p.set_defaults(func=cmd_journal)
+
+    p = j_sub.add_parser("stats", help="View journal statistics")
+    p.set_defaults(func=cmd_journal_stats)
+
+    p = j_sub.add_parser("streak", help="View current streak")
+    p.set_defaults(func=cmd_journal_streak)
+
+    # Set default journal action to write
+    j_parser.set_defaults(func=cmd_journal)
+
+    # speak
+    sp_parser = sub.add_parser("speak", help="English speaking coach")
+    sp_sub = sp_parser.add_subparsers(dest="sp_command")
+
+    p = sp_sub.add_parser("start", help="Start speaking session")
+    p.add_argument("--scenario", "-s", choices=["standup", "code_review", "presentation", "interview", "free"], default="free")
+    p.set_defaults(func=cmd_speak)
+
+    p = sp_sub.add_parser("progress", help="View speaking progress")
+    p.set_defaults(func=cmd_speak_progress)
+
+    sp_parser.add_argument("--scenario", "-s", choices=["standup", "code_review", "presentation", "interview", "free"], default="free")
+    sp_parser.set_defaults(func=cmd_speak)
+
+    # kb (knowledge base)
+    kb_parser = sub.add_parser("kb", help="Knowledge base (Obsidian bridge)")
+    kb_sub = kb_parser.add_subparsers(dest="kb_command", required=True)
+
+    p = kb_sub.add_parser("search", help="Search notes")
+    p.add_argument("query")
+    p.set_defaults(func=cmd_kb_search)
+
+    p = kb_sub.add_parser("reindex", help="Reindex vault")
+    p.add_argument("--vault", "-v", help="Path to Obsidian vault")
+    p.set_defaults(func=cmd_kb_reindex)
+
+    p = kb_sub.add_parser("ask", help="Ask a question using your notes")
+    p.add_argument("question")
+    p.set_defaults(func=cmd_kb_ask)
 
     argcomplete.autocomplete(parser)
     args = parser.parse_args()
