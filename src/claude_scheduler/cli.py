@@ -316,6 +316,27 @@ def cmd_artifacts(args):
     db.close()
 
 
+# ── Course feedback ──
+
+def cmd_feedback(args):
+    """Record feedback for a course lesson."""
+    import json
+    course_dir = Path.home() / ".config" / "claude-scheduler" / "courses" / args.course
+    progress_file = course_dir / "progress.json"
+    if not progress_file.exists():
+        console.print(f"[red]Course '{args.course}' not found[/red]")
+        return
+    data = json.loads(progress_file.read_text())
+    entry = {
+        "day": data["current_day"] - 1,
+        "rating": args.rating,
+        "note": args.note or "",
+    }
+    data.setdefault("feedback", []).append(entry)
+    progress_file.write_text(json.dumps(data, indent=2))
+    console.print(f"[green]Feedback recorded[/green] for day {entry['day']}: rating {args.rating}/5")
+
+
 # ── Argument parser ──
 
 def main():
@@ -421,6 +442,13 @@ def main():
     p = sub.add_parser("artifacts", help="Show task artifacts")
     p.add_argument("task_name")
     p.set_defaults(func=cmd_artifacts)
+
+    # course feedback
+    p = sub.add_parser("feedback", help="Rate a course lesson")
+    p.add_argument("course", help="Course name (e.g. pm-ai-era)")
+    p.add_argument("--rating", "-r", type=int, required=True, choices=[1, 2, 3, 4, 5])
+    p.add_argument("--note", "-n", help="Optional feedback note")
+    p.set_defaults(func=cmd_feedback)
 
     argcomplete.autocomplete(parser)
     args = parser.parse_args()
