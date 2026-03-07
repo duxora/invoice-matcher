@@ -1,8 +1,11 @@
 """Core matching logic: rename plan generation and execution."""
+import re
 from pathlib import Path
 
 DEFAULT_PATTERN = "{invoice}"
 DEFAULT_SEPARATOR = "_"
+# Characters invalid in filenames on macOS/Linux/Windows
+UNSAFE_FILENAME_CHARS = re.compile(r'[/\\:*?"<>|]')
 
 
 def generate_rename_plan(
@@ -23,7 +26,9 @@ def generate_rename_plan(
     for filename, invoices in matches.items():
         if not invoices:
             continue
-        invoice_str = separator.join(invoices)
+        # Sanitize separator for filename safety (e.g. "/" → "-")
+        safe_sep = UNSAFE_FILENAME_CHARS.sub("-", separator) if separator else "-"
+        invoice_str = safe_sep.join(invoices)
         original_path = Path(filename)
         original_stem = original_path.stem
         extension = original_path.suffix  # preserves case: .pdf, .PDF

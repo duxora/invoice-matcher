@@ -53,10 +53,14 @@
         .key-form input { margin-bottom: 0; flex: 1; }
         .settings-toggle { float: right; }
         .dir-input-row { display: flex; gap: 0.5rem; align-items: flex-start; }
-        .dir-input-row input[type="text"] { flex: 1; margin-bottom: 0; }
         .dir-input-row label.browse-btn { margin-bottom: 0; }
         .browse-btn { display: inline-flex; align-items: center; padding: 0.6rem 1rem; border: 1px solid #ced4da; border-radius: 4px; cursor: pointer; font-size: 0.9rem; color: #495057; background: #fff; white-space: nowrap; }
         .browse-btn:hover { background: #f1f3f5; }
+        .input-wrap { position: relative; flex: 1; }
+        .input-wrap input[type="text"] { width: 100%; padding-right: 2rem; margin-bottom: 0; }
+        .btn-clear { display: none; position: absolute; right: 0.5rem; top: 50%; transform: translateY(-50%); align-items: center; justify-content: center; width: 20px; height: 20px; padding: 0; border: none; border-radius: 50%; background: #adb5bd; color: #fff; cursor: pointer; font-size: 0.7rem; line-height: 1; z-index: 1; transition: background 0.15s; }
+        .btn-clear:hover { background: #dc3545; }
+        .btn-clear.visible { display: inline-flex; }
         .mb-1 { margin-bottom: 1rem; }
     </style>
 </head>
@@ -92,19 +96,43 @@
             No API key configured. Click <strong>Settings</strong> above to add your Gemini API key.
         </div>
         <form id="scan-form">
-            <label for="directory">Directory Path</label>
-            <p class="help">Full path to the folder containing your PDF files</p>
+            <label>Invoice Files</label>
+            <p class="help">Select a folder or upload a .zip file containing your PDF invoices. You can also paste a folder path directly.</p>
             <div class="dir-input-row mb-1">
-                <input type="text" id="directory" name="directory" placeholder="/Users/you/invoices" required>
-                <label class="browse-btn" for="dir-picker" title="Browse for a file in the target folder">Browse</label>
-                <input type="file" id="dir-picker" style="display:none;" webkitdirectory>
+                <div class="input-wrap">
+                    <input type="text" id="directory" name="directory" placeholder="/Users/you/invoices" required>
+                    <button type="button" class="btn-clear" data-clear="directory" title="Clear">&times;</button>
+                </div>
+                <button type="button" class="browse-btn" id="folder-btn" title="Open native folder picker">Select Folder</button>
+                <label class="browse-btn" for="zip-picker" title="Upload a .zip file containing PDFs">Upload ZIP</label>
+                <input type="file" id="zip-picker" accept=".zip" style="display:none;">
+            </div>
+            <div id="upload-status" style="display:none; margin-bottom:1rem;">
+                <span class="status status-saved" id="upload-status-text"></span>
             </div>
 
-            <label for="master_file">Master Invoice File</label>
-            <p class="help">Filename of the master list within that directory</p>
-            <select id="master_file" name="master_file" disabled>
-                <option value="">-- Enter directory first --</option>
+            <label>Master Invoice File</label>
+            <p class="help">The PDF that contains the master list of all invoice numbers. Browse for any file, or pick from the directory.</p>
+            <div class="dir-input-row mb-1">
+                <div class="input-wrap">
+                    <input type="text" id="master_file_path" placeholder="No file selected" readonly style="background:#f8f9fa;">
+                    <button type="button" class="btn-clear" data-clear="master" title="Clear">&times;</button>
+                </div>
+                <button type="button" class="browse-btn" id="master-browse-btn" title="Browse for master PDF file">Browse</button>
+            </div>
+            <select id="master_file_select" name="master_file" style="display:none; margin-bottom:1rem;">
+                <option value="">-- Select from directory files --</option>
             </select>
+
+            <label>Output Folder <span style="font-weight:normal; color:#6c757d;">(optional)</span></label>
+            <p class="help">Where renamed files will be saved. If empty, an <code>outputs</code> subfolder is created in the source folder. <strong>Required</strong> when using ZIP upload.</p>
+            <div class="dir-input-row mb-1">
+                <div class="input-wrap">
+                    <input type="text" id="output_dir" placeholder="Leave empty to use 'outputs' subfolder">
+                    <button type="button" class="btn-clear" data-clear="output_dir" title="Clear">&times;</button>
+                </div>
+                <button type="button" class="browse-btn" id="output-browse-btn" title="Select output folder">Browse</button>
+            </div>
 
             <div class="row">
                 <div>
@@ -114,8 +142,8 @@
                 </div>
                 <div>
                     <label for="separator">Multi-Invoice Separator</label>
-                    <p class="help">When a file has multiple invoices, join them with this character.</p>
-                    <input type="text" id="separator" name="separator" value="_" placeholder="_" style="max-width: 80px;">
+                    <p class="help">When a file has multiple invoices, join them with this character. If unsupported by your OS (e.g. <code>/</code>), it's replaced with <code>-</code>.</p>
+                    <input type="text" id="separator" name="separator" value="/" placeholder="/" style="max-width: 80px;">
                 </div>
             </div>
 
@@ -208,22 +236,65 @@
             } catch (e) { /* ignore */ }
         }
 
-        // --- Directory browser ---
+        // --- Directory / ZIP ---
         const dirInput = document.getElementById('directory');
-        const masterSelect = document.getElementById('master_file');
+        const masterSelect = document.getElementById('master_file_select');
+        const masterPathInput = document.getElementById('master_file_path');
         let debounceTimer;
+        let uploadedMasterFile = null;
+        let isZipUpload = false;
 
-        document.getElementById('dir-picker').addEventListener('change', function(e) {
-            const files = e.target.files;
-            if (files.length > 0) {
-                // Extract directory path from the first file's webkitRelativePath
-                const relativePath = files[0].webkitRelativePath;
-                const folderName = relativePath.split('/')[0];
-                // We can't get the absolute path from browser — show a hint
-                dirInput.value = '';
-                dirInput.placeholder = 'Browser cannot access full path. Please paste the folder path manually.';
-                dirInput.focus();
-                alert('Due to browser security, the full folder path cannot be read automatically.\n\nPlease paste the full path to your folder in the text field.\n\nTip (Mac): Drag the folder from Finder into Terminal to see the path.');
+        function setUploadStatus(text, isError) {
+            const statusDiv = document.getElementById('upload-status');
+            const statusText = document.getElementById('upload-status-text');
+            statusDiv.style.display = 'block';
+            statusText.textContent = text;
+            statusText.className = 'status ' + (isError ? 'status-unmatched' : 'status-matched');
+        }
+
+        // --- Folder picker: native dialog via backend ---
+        document.getElementById('folder-btn').addEventListener('click', async function() {
+            setUploadStatus('Opening folder picker...', false);
+            try {
+                const resp = await fetch('/api/browse-folder', { method: 'POST' });
+                if (!resp.ok) {
+                    const err = await resp.json();
+                    throw new Error(err.detail || 'No folder selected');
+                }
+                const data = await resp.json();
+                dirInput.value = data.directory;
+                isZipUpload = false;
+                setUploadStatus(data.files.length + ' PDF(s) found in folder', false);
+                showMasterDropdown(data.files);
+                if (typeof updateClearButtons === 'function') updateClearButtons();
+            } catch (err) {
+                setUploadStatus(err.message === 'No folder selected' ? '' : 'Error: ' + err.message, err.message !== 'No folder selected');
+                if (err.message === 'No folder selected') document.getElementById('upload-status').style.display = 'none';
+            }
+        });
+
+        // --- ZIP picker: upload and extract ---
+        document.getElementById('zip-picker').addEventListener('change', async function(e) {
+            const file = e.target.files[0];
+            if (!file) return;
+            setUploadStatus('Uploading ' + file.name + '...', false);
+
+            const formData = new FormData();
+            formData.append('file', file);
+            try {
+                const resp = await fetch('/api/upload-zip', { method: 'POST', body: formData });
+                if (!resp.ok) {
+                    const err = await resp.json();
+                    throw new Error(err.detail || 'Upload failed');
+                }
+                const data = await resp.json();
+                dirInput.value = data.directory;
+                isZipUpload = true;
+                setUploadStatus('Extracted ' + data.files.length + ' PDF(s) from ' + file.name, false);
+                showMasterDropdown(data.files);
+                if (typeof updateClearButtons === 'function') updateClearButtons();
+            } catch (err) {
+                setUploadStatus('Error: ' + err.message, true);
             }
         });
 
@@ -239,10 +310,68 @@
                 const resp = await fetch('/api/list-files?directory=' + encodeURIComponent(dir));
                 if (!resp.ok) return;
                 const files = await resp.json();
-                masterSelect.innerHTML = files.map(f => '<option value="' + f + '">' + f + '</option>').join('');
-                masterSelect.disabled = false;
+                showMasterDropdown(files);
             } catch (e) { /* ignore */ }
         }
+
+        function showMasterDropdown(files) {
+            // When directory has files, show a dropdown to pick master from directory
+            if (files.length > 0) {
+                masterSelect.innerHTML = '<option value="">-- Select from directory files --</option>' +
+                    files.map(f => '<option value="' + f + '">' + f + '</option>').join('');
+                masterSelect.style.display = 'block';
+                masterSelect.disabled = false;
+            }
+        }
+
+        // When user selects from dropdown, clear the browsed master
+        masterSelect.addEventListener('change', function() {
+            if (masterSelect.value) {
+                uploadedMasterFile = null;
+                masterPathInput.value = dirInput.value + '/' + masterSelect.value;
+                if (typeof updateClearButtons === 'function') updateClearButtons();
+            }
+        });
+
+        // Master file browse — native file picker via backend
+        document.getElementById('master-browse-btn').addEventListener('click', async function() {
+            try {
+                const resp = await fetch('/api/browse-master', { method: 'POST' });
+                if (!resp.ok) {
+                    const err = await resp.json();
+                    if (err.detail !== 'No file selected') alert(err.detail);
+                    return;
+                }
+                const data = await resp.json();
+                uploadedMasterFile = data;
+                masterPathInput.value = data.path;
+                // If no directory set yet, use the master file's directory
+                if (!dirInput.value.trim()) {
+                    dirInput.value = data.directory;
+                    loadFiles();
+                }
+                if (typeof updateClearButtons === 'function') updateClearButtons();
+            } catch (err) {
+                alert('Failed to browse: ' + err.message);
+            }
+        });
+
+        // --- Output folder browse ---
+        document.getElementById('output-browse-btn').addEventListener('click', async function() {
+            try {
+                const resp = await fetch('/api/browse-folder', { method: 'POST' });
+                if (!resp.ok) {
+                    const err = await resp.json();
+                    if (err.detail !== 'No folder selected') alert(err.detail);
+                    return;
+                }
+                const data = await resp.json();
+                document.getElementById('output_dir').value = data.directory;
+                if (typeof updateClearButtons === 'function') updateClearButtons();
+            } catch (err) {
+                alert('Failed to browse: ' + err.message);
+            }
+        });
 
         // --- Scan ---
         document.getElementById('scan-form').addEventListener('submit', async (e) => {
@@ -264,12 +393,25 @@
             document.getElementById('rename-section').style.display = 'none';
 
             try {
+                const outputDir = document.getElementById('output_dir').value.trim();
+                if (isZipUpload && !outputDir) {
+                    throw new Error('Output folder is required when using ZIP upload');
+                }
+
                 const body = {
                     directory: document.getElementById('directory').value,
-                    master_file: masterSelect.value,
+                    output_dir: outputDir,
                     pattern: document.getElementById('pattern').value || '{invoice}',
-                    separator: document.getElementById('separator').value || '_',
+                    separator: document.getElementById('separator').value || '/',
                 };
+
+                if (uploadedMasterFile && uploadedMasterFile.path) {
+                    body.master_path = uploadedMasterFile.path;
+                } else if (masterSelect.value) {
+                    body.master_file = masterSelect.value;
+                } else {
+                    throw new Error('Please select a master invoice file');
+                }
 
                 const resp = await fetch('/api/scan', {
                     method: 'POST',
@@ -318,7 +460,7 @@
 
             if (matchCount > 0) {
                 document.getElementById('rename-section').style.display = 'block';
-                window._renamePlan = { directory: data.directory, plan: data.plan };
+                window._renamePlan = { directory: data.directory, output_dir: data.output_dir, plan: data.plan };
             }
         }
 
@@ -340,6 +482,9 @@
                 for (const s of result.skipped) {
                     html += '<p><span class="status status-skipped">Skipped</span> ' + s.old + ' (' + s.reason + ')</p>';
                 }
+                if (result.output_dir) {
+                    html += '<p style="margin-top:0.5rem;"><strong>Output folder:</strong> <code>' + result.output_dir + '</code></p>';
+                }
                 div.innerHTML = html || '<p>No files renamed.</p>';
                 document.getElementById('rename-section').querySelector('h2').textContent = 'Rename Complete';
                 btn.style.display = 'none';
@@ -349,8 +494,57 @@
             }
         });
 
+        // --- Clear buttons ---
+        function updateClearButtons() {
+            document.querySelectorAll('.btn-clear').forEach(btn => {
+                const target = btn.dataset.clear;
+                let hasValue = false;
+                if (target === 'directory') {
+                    hasValue = !!dirInput.value.trim();
+                } else if (target === 'master') {
+                    hasValue = !!masterPathInput.value.trim();
+                } else if (target === 'output_dir') {
+                    hasValue = !!document.getElementById('output_dir').value.trim();
+                }
+                btn.classList.toggle('visible', hasValue);
+            });
+        }
+
+        document.querySelectorAll('.btn-clear').forEach(btn => {
+            btn.addEventListener('click', function() {
+                const target = this.dataset.clear;
+                if (target === 'directory') {
+                    dirInput.value = '';
+                    isZipUpload = false;
+                    masterSelect.style.display = 'none';
+                    masterSelect.innerHTML = '<option value="">-- Select from directory files --</option>';
+                    document.getElementById('upload-status').style.display = 'none';
+                } else if (target === 'master') {
+                    masterPathInput.value = '';
+                    uploadedMasterFile = null;
+                    masterSelect.value = '';
+                } else if (target === 'output_dir') {
+                    document.getElementById('output_dir').value = '';
+                }
+                updateClearButtons();
+            });
+        });
+
+        // Update clear button visibility on input changes
+        dirInput.addEventListener('input', updateClearButtons);
+        document.getElementById('output_dir').addEventListener('input', updateClearButtons);
+        // Also observe programmatic changes via MutationObserver on value isn't reliable,
+        // so we call updateClearButtons after each action that sets values
+        const _origSetUploadStatus = setUploadStatus;
+        setUploadStatus = function(text, isError) { _origSetUploadStatus(text, isError); updateClearButtons(); };
+
+        // Patch browse handlers to update clear buttons
+        const origShowMasterDropdown = showMasterDropdown;
+        showMasterDropdown = function(files) { origShowMasterDropdown(files); updateClearButtons(); };
+
         // Load settings on page load
         loadSettings();
+        updateClearButtons();
     </script>
 </body>
 </html>
