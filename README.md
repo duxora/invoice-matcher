@@ -67,28 +67,15 @@ You need Python 3.10 or newer on your computer.
 > **Cost:** The free tier gives you 15 requests/minute and 1,500 requests/day.
 > That's enough for ~1,500 PDF files per day at no cost.
 
-### Step 3: Download Invoice Matcher
+### Step 3: Install Invoice Matcher
 
-**Option A — If you have Git:**
+Open Terminal (Mac) or Command Prompt (Windows), navigate to the invoice-matcher folder:
 ```
-git clone https://github.com/duxora/invoice-matcher.git
-cd invoice-matcher
+cd path/to/invoice-matcher
 ```
+**Tip (Mac):** Type `cd ` then drag the folder from Finder into Terminal to auto-fill the path.
 
-**Option B — Without Git:**
-1. Go to https://github.com/duxora/invoice-matcher
-2. Click the green **"Code"** button, then **"Download ZIP"**
-3. Extract the ZIP file to a folder on your computer
-4. Open Terminal (Mac) or Command Prompt (Windows)
-5. Navigate to the extracted folder:
-   ```
-   cd path/to/invoice-matcher
-   ```
-   **Tip (Mac):** Type `cd ` then drag the folder from Finder into Terminal to auto-fill the path.
-
-### Step 4: Install Invoice Matcher
-
-In Terminal / Command Prompt, run:
+Then run:
 
 ```
 pip install -e .
@@ -101,7 +88,7 @@ pip3 install -e .
 
 You should see "Successfully installed invoice-matcher" at the end.
 
-### Step 5: Start the App
+### Step 4: Start the App
 
 Run this command:
 
