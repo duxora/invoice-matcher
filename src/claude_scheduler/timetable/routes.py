@@ -1,6 +1,7 @@
 """Timetable web routes -- weekly view, daily view, add/edit entries."""
 import os
 from datetime import date, timedelta
+from functools import lru_cache
 
 from fastapi import APIRouter, Form, Request
 from fastapi.responses import HTMLResponse, RedirectResponse
@@ -26,6 +27,7 @@ FAMILY_MEMBERS = [
 ]
 
 
+@lru_cache(maxsize=1)
 def get_service() -> TimetableService:
     spreadsheet_id = os.environ.get("TIMETABLE_SPREADSHEET_ID", "")
     credentials_path = os.environ.get("GOOGLE_CREDENTIALS_PATH", "")

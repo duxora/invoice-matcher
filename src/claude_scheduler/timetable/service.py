@@ -56,7 +56,4 @@ class TimetableService:
     def get_pending_reminders(self) -> list[dict[str, Any]]:
         """Get all unfinished reminders."""
         records = self.sheets.fetch_sheet("Reminders")
-        return [
-            r for r in records
-            if not r.get("Done") and r.get("Done") != "yes"
-        ]
+        return [r for r in records if not r.get("Done")]
