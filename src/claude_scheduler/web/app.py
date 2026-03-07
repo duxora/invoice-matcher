@@ -1,9 +1,12 @@
 """Claude Scheduler — FastAPI web application."""
+import os
+
 from fastapi import FastAPI, Request
 from fastapi.responses import HTMLResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 from pathlib import Path
+from starlette.middleware.sessions import SessionMiddleware
 
 app = FastAPI(
     title="Claude Scheduler",
@@ -14,6 +17,7 @@ app = FastAPI(
 WEB_DIR = Path(__file__).parent
 templates = Jinja2Templates(directory=str(WEB_DIR / "templates"))
 app.mount("/static", StaticFiles(directory=str(WEB_DIR / "static")), name="static")
+app.add_middleware(SessionMiddleware, secret_key=os.environ.get("SESSION_SECRET", "dev-secret-change-me"))
 
 # Registry of installed apps
 APPS = []
@@ -43,5 +47,11 @@ async def server_error(request: Request, exc):
 
 # Register apps
 from claude_scheduler.web.routes import router as scheduler_router
-register_app("Scheduler", "Claude task scheduler dashboard", "/scheduler")
+register_app("Scheduler", "Claude task scheduler dashboard", "/scheduler", icon="⚙️")
 app.include_router(scheduler_router, prefix="/scheduler")
+
+from claude_scheduler.timetable.routes import router as timetable_router
+from claude_scheduler.timetable.auth import auth_router
+app.include_router(auth_router)
+register_app("Timetable", "Family timetable & study planner", "/timetable", icon="📅")
+app.include_router(timetable_router, prefix="/timetable")
