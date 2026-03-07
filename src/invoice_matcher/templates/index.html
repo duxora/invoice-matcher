@@ -68,7 +68,7 @@
     <h1>Invoice Matcher
         <button class="btn-sm btn-outline settings-toggle" onclick="toggleSettings()">Settings</button>
     </h1>
-    <p class="subtitle">Match invoice PDFs against a master list using Gemini AI</p>
+    <p class="subtitle">Match invoice documents against a master list using Gemini AI</p>
 
     <!-- Settings Card (collapsible) -->
     <div class="card" id="settings-card" style="display:none;">
@@ -97,7 +97,7 @@
         </div>
         <form id="scan-form">
             <label>Invoice Files</label>
-            <p class="help">Select a folder or upload a .zip file containing your PDF invoices. You can also paste a folder path directly.</p>
+            <p class="help">Select a folder or upload a .zip file containing your invoice documents (PDF, images, Word, Excel, PowerPoint).</p>
             <div class="dir-input-row mb-1">
                 <div class="input-wrap">
                     <input type="text" id="directory" name="directory" placeholder="/Users/you/invoices" required>
@@ -112,7 +112,7 @@
             </div>
 
             <label>Master Invoice File</label>
-            <p class="help">The PDF that contains the master list of all invoice numbers. Browse for any file, or pick from the directory.</p>
+            <p class="help">The document that contains the master list of all invoice numbers. Browse for any file, or pick from the directory.</p>
             <div class="dir-input-row mb-1">
                 <div class="input-wrap">
                     <input type="text" id="master_file_path" placeholder="No file selected" readonly style="background:#f8f9fa;">

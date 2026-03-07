@@ -20,7 +20,14 @@ app = FastAPI(title="Invoice Matcher", version="0.1.0")
 TEMPLATES_DIR = Path(__file__).parent / "templates"
 templates = Jinja2Templates(directory=str(TEMPLATES_DIR))
 
-SUPPORTED_EXTENSIONS = {".pdf"}
+SUPPORTED_EXTENSIONS = {
+    ".pdf",
+    ".png", ".jpg", ".jpeg",
+    ".doc", ".docx",
+    ".xls", ".xlsx",
+    ".ppt", ".pptx",
+    ".tiff", ".tif",
+}
 CONFIG_DIR = Path.home() / ".config" / "invoice-matcher"
 CONFIG_FILE = CONFIG_DIR / "settings.json"
 
@@ -206,14 +213,14 @@ async def scan(req: ScanRequest):
 
     # Step 1: Extract invoice list from master
     try:
-        master_invoices = extract_invoice_list(master_bytes, api_key=api_key)
+        master_invoices = extract_invoice_list(master_bytes, api_key=api_key, filename=master_filename)
     except Exception as e:
         raise HTTPException(500, f"Failed to read master file: {e}")
 
     if not master_invoices:
         raise HTTPException(400, "No invoice numbers found in master file")
 
-    # Step 2: Scan each remaining PDF
+    # Step 2: Scan each remaining document
     other_files = [
         f for f in dir_path.iterdir()
         if f.is_file()
@@ -222,15 +229,16 @@ async def scan(req: ScanRequest):
     ]
 
     matches: dict[str, dict] = {}
-    for pdf_file in sorted(other_files, key=lambda f: f.name):
+    for doc_file in sorted(other_files, key=lambda f: f.name):
         try:
-            pdf_bytes = pdf_file.read_bytes()
+            file_bytes = doc_file.read_bytes()
             found = extract_invoices_from_pdf(
-                pdf_bytes, known_invoices=master_invoices, api_key=api_key
+                file_bytes, known_invoices=master_invoices, api_key=api_key,
+                filename=doc_file.name,
             )
-            matches[pdf_file.name] = {"invoices": found}
+            matches[doc_file.name] = {"invoices": found}
         except Exception as e:
-            matches[pdf_file.name] = {"invoices": [], "error": str(e)}
+            matches[doc_file.name] = {"invoices": [], "error": str(e)}
 
     # Step 3: Generate rename plan
     match_map = {name: info["invoices"] for name, info in matches.items()}
@@ -258,7 +266,7 @@ async def browse_master():
 
     if sys.platform == "darwin":
         result = subprocess.run(
-            ["osascript", "-e", 'POSIX path of (choose file with prompt "Select master invoice PDF" of type {"pdf"})'],
+            ["osascript", "-e", 'POSIX path of (choose file with prompt "Select master invoice file")'],
             capture_output=True, text=True, timeout=120,
         )
         if result.returncode != 0:
@@ -268,8 +276,8 @@ async def browse_master():
         script = (
             'Add-Type -AssemblyName System.Windows.Forms; '
             '$d = New-Object System.Windows.Forms.OpenFileDialog; '
-            '$d.Title = "Select master invoice PDF"; '
-            '$d.Filter = "PDF files (*.pdf)|*.pdf"; '
+            '$d.Title = "Select master invoice file"; '
+            '$d.Filter = "Documents (*.pdf;*.png;*.jpg;*.doc;*.docx;*.xls;*.xlsx)|*.pdf;*.png;*.jpg;*.jpeg;*.doc;*.docx;*.xls;*.xlsx;*.ppt;*.pptx;*.tiff;*.tif|All files (*.*)|*.*"; '
             'if ($d.ShowDialog() -eq "OK") { $d.FileName } else { exit 1 }'
         )
         result = subprocess.run(
@@ -281,7 +289,7 @@ async def browse_master():
         file_path = result.stdout.strip()
     else:
         result = subprocess.run(
-            ["zenity", "--file-selection", "--file-filter=PDF files | *.pdf", "--title=Select master invoice PDF"],
+            ["zenity", "--file-selection", "--file-filter=Documents | *.pdf *.png *.jpg *.jpeg *.doc *.docx *.xls *.xlsx *.ppt *.pptx *.tiff *.tif", "--title=Select master invoice file"],
             capture_output=True, text=True, timeout=120,
         )
         if result.returncode != 0:
