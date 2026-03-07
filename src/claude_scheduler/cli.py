@@ -620,6 +620,38 @@ def cmd_speak_progress(args):
     console.print(t)
 
 
+# ── Demo ──
+
+def cmd_demo(args):
+    from claude_scheduler.demo.runner import run_demo, run_all_demos
+    from claude_scheduler.demo.scripts import list_demos as _list_demos
+
+    workdir = str(Path(__file__).parent.parent.parent)  # automation-hub root
+
+    if args.demo_name == "list":
+        t = Table(title="Available Demos")
+        t.add_column("Name")
+        t.add_column("Description")
+        for d in _list_demos():
+            t.add_row(d["key"], d["description"])
+        console.print(t)
+        return
+
+    record = not args.no_record
+    to_gif = args.gif
+
+    if args.demo_name == "all":
+        paths = run_all_demos(record=record, workdir=workdir, to_gif=to_gif)
+        if paths:
+            console.print("\n[green]Recordings saved:[/green]")
+            for p in paths:
+                console.print(f"  {p}")
+    else:
+        path = run_demo(args.demo_name, record=record, workdir=workdir, to_gif=to_gif)
+        if path:
+            console.print(f"\n[green]Recording saved:[/green] {path}")
+
+
 # ── Knowledge Base ──
 
 def cmd_kb_search(args):
@@ -848,6 +880,14 @@ def main():
     p = kb_sub.add_parser("ask", help="Ask a question using your notes")
     p.add_argument("question")
     p.set_defaults(func=cmd_kb_ask)
+
+    # demo
+    p = sub.add_parser("demo", help="Record demo videos of tools")
+    p.add_argument("demo_name", nargs="?", default="list",
+                   help="Demo to run: workflow, gateway, debate, journal, speak, kb, all, list")
+    p.add_argument("--no-record", action="store_true", help="Run without recording")
+    p.add_argument("--gif", action="store_true", help="Convert to GIF (requires agg)")
+    p.set_defaults(func=cmd_demo)
 
     argcomplete.autocomplete(parser)
     args = parser.parse_args()
