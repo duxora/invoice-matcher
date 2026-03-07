@@ -55,9 +55,16 @@ class SheetsClient:
     def __init__(self, spreadsheet_id: str, credentials_path: str):
         self.spreadsheet_id = spreadsheet_id
         self.credentials_path = credentials_path
-        self._spreadsheet = self._open_spreadsheet()
+        self._spreadsheet = None
         self._cache: dict[str, tuple[float, list[dict]]] = {}
         self._cache_ttl = 60  # seconds
+
+    @property
+    def spreadsheet(self):
+        """Lazy connection to Google Sheets."""
+        if self._spreadsheet is None:
+            self._spreadsheet = self._open_spreadsheet()
+        return self._spreadsheet
 
     def _open_spreadsheet(self):
         creds = Credentials.from_service_account_file(self.credentials_path, scopes=SCOPES)
@@ -72,7 +79,7 @@ class SheetsClient:
             if now - cached_time < self._cache_ttl:
                 return cached_data
 
-        ws = self._spreadsheet.worksheet(sheet_name)
+        ws = self.spreadsheet.worksheet(sheet_name)
         records = ws.get_all_records()
         self._cache[sheet_name] = (now, records)
         return records
@@ -94,7 +101,7 @@ class SheetsClient:
 
     def append_row(self, sheet_name: str, data: dict[str, Any]) -> None:
         """Append a new row to a sheet."""
-        ws = self._spreadsheet.worksheet(sheet_name)
+        ws = self.spreadsheet.worksheet(sheet_name)
         columns = SHEET_COLUMNS.get(sheet_name, list(data.keys()))
         row = [data.get(col, "") for col in columns]
         ws.append_row(row)
@@ -103,7 +110,7 @@ class SheetsClient:
 
     def update_row(self, sheet_name: str, row_index: int, data: dict[str, Any]) -> None:
         """Update an entire row (row_index is 1-based, header is row 1, data starts at row 2)."""
-        ws = self._spreadsheet.worksheet(sheet_name)
+        ws = self.spreadsheet.worksheet(sheet_name)
         columns = SHEET_COLUMNS.get(sheet_name, list(data.keys()))
         values = [data.get(col, "") for col in columns]
         # row_index is the data row (0-based from records), sheet row = row_index + 2 (header + 1-based)
@@ -117,7 +124,7 @@ class SheetsClient:
         """Delete a row. Returns the deleted record for logging."""
         records = self.fetch_sheet(sheet_name)
         deleted = records[row_index] if row_index < len(records) else {}
-        ws = self._spreadsheet.worksheet(sheet_name)
+        ws = self.spreadsheet.worksheet(sheet_name)
         sheet_row = row_index + 2
         ws.delete_rows(sheet_row)
         self._invalidate_cache(sheet_name)
@@ -126,7 +133,7 @@ class SheetsClient:
 
     def update_cell(self, sheet_name: str, row: int, col: int, value: str) -> None:
         """Update a single cell."""
-        ws = self._spreadsheet.worksheet(sheet_name)
+        ws = self.spreadsheet.worksheet(sheet_name)
         ws.update_cell(row, col, value)
         self._invalidate_cache(sheet_name)
 

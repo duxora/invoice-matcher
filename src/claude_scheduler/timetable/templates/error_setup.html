@@ -1,0 +1,30 @@
+{% extends "base.html" %}
+{% block title %}Setup Required - Family Timetable{% endblock %}
+
+{% block content %}
+<div class="max-w-2xl mx-auto mt-12">
+  <div class="bg-hub-card border border-yellow-500/30 rounded-lg p-8">
+    <h1 class="text-2xl font-bold mb-4 text-yellow-400">Setup Required</h1>
+    <p class="text-hub-muted mb-4">Could not connect to Google Sheets. Please check your configuration:</p>
+
+    <div class="bg-hub-bg rounded p-4 mb-4 text-sm">
+      <p class="text-red-400 font-mono mb-3">{{ error }}</p>
+    </div>
+
+    <div class="space-y-3 text-sm">
+      <h3 class="font-semibold text-hub-text">Checklist:</h3>
+      <ol class="list-decimal list-inside space-y-2 text-hub-muted">
+        <li>Create a Google Sheet with 4 tabs: <strong>Tasks</strong>, <strong>Study</strong>, <strong>Reminders</strong>, <strong>Events</strong></li>
+        <li>Add header rows to each tab (Date, Time, Person, Title, etc.)</li>
+        <li>Share the sheet with your service account email as <strong>Editor</strong></li>
+        <li>Set <code class="bg-hub-bg px-1 rounded">TIMETABLE_SPREADSHEET_ID</code> in <code>~/.config/claude-scheduler/.env</code></li>
+        <li>Set <code class="bg-hub-bg px-1 rounded">GOOGLE_CREDENTIALS_PATH</code> to your service account JSON</li>
+      </ol>
+    </div>
+
+    <div class="mt-6">
+      <a href="/timetable/" class="btn btn-primary">Retry</a>
+    </div>
+  </div>
+</div>
+{% endblock %}

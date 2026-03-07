@@ -120,10 +120,15 @@ async def weekly_view(request: Request, week: str | None = None, member: str = "
     today = date.today()
     start = date.fromisoformat(week) if week else today - timedelta(days=today.weekday())
     svc = get_service()
-    week_data = svc.get_week_data(start.isoformat(), member=member)
-    reminders = svc.get_pending_reminders()
-    overdue = svc.get_overdue_items()
-    conflicts_today = svc.detect_conflicts(today.isoformat())
+    try:
+        week_data = svc.get_week_data(start.isoformat(), member=member)
+        reminders = svc.get_pending_reminders()
+        overdue = svc.get_overdue_items()
+        conflicts_today = svc.detect_conflicts(today.isoformat())
+    except (PermissionError, Exception) as e:
+        return templates.TemplateResponse("error_setup.html", app_context(
+            request, error=str(e),
+        ))
 
     days = []
     for i in range(7):
