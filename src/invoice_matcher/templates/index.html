@@ -23,6 +23,11 @@
         .btn-primary:disabled { background: #6c757d; cursor: not-allowed; }
         .btn-success { background: #198754; color: #fff; }
         .btn-success:hover { background: #157347; }
+        .btn-sm { padding: 0.4rem 0.8rem; font-size: 0.85rem; }
+        .btn-outline { background: transparent; border: 1px solid #ced4da; color: #495057; }
+        .btn-outline:hover { background: #f1f3f5; }
+        .btn-danger-outline { background: transparent; border: 1px solid #dc3545; color: #dc3545; }
+        .btn-danger-outline:hover { background: #f8d7da; }
         table { width: 100%; border-collapse: collapse; margin-top: 1rem; }
         th, td { padding: 0.6rem; text-align: left; border-bottom: 1px solid #dee2e6; }
         th { background: #f1f3f5; font-weight: 600; }
@@ -33,26 +38,67 @@
         .status-unmatched { background: #f8d7da; color: #842029; }
         .status-renamed { background: #d1e7dd; color: #0f5132; }
         .status-skipped { background: #fff3cd; color: #664d03; }
+        .status-saved { background: #d1e7dd; color: #0f5132; }
         #loading { display: none; margin-top: 1rem; }
         .spinner { display: inline-block; width: 1rem; height: 1rem; border: 2px solid #0d6efd; border-top-color: transparent; border-radius: 50%; animation: spin 0.6s linear infinite; }
         @keyframes spin { to { transform: rotate(360deg); } }
         .progress-text { margin-left: 0.5rem; }
         #results, #rename-section { display: none; }
         .error { background: #f8d7da; color: #842029; padding: 1rem; border-radius: 4px; margin-top: 1rem; }
+        .key-status { display: inline-flex; align-items: center; gap: 0.5rem; margin-bottom: 1rem; }
+        .key-status .dot { width: 8px; height: 8px; border-radius: 50%; display: inline-block; }
+        .key-status .dot-green { background: #198754; }
+        .key-status .dot-red { background: #dc3545; }
+        .key-form { display: flex; gap: 0.5rem; align-items: flex-start; }
+        .key-form input { margin-bottom: 0; flex: 1; }
+        .settings-toggle { float: right; }
+        .dir-input-row { display: flex; gap: 0.5rem; align-items: flex-start; }
+        .dir-input-row input[type="text"] { flex: 1; margin-bottom: 0; }
+        .dir-input-row label.browse-btn { margin-bottom: 0; }
+        .browse-btn { display: inline-flex; align-items: center; padding: 0.6rem 1rem; border: 1px solid #ced4da; border-radius: 4px; cursor: pointer; font-size: 0.9rem; color: #495057; background: #fff; white-space: nowrap; }
+        .browse-btn:hover { background: #f1f3f5; }
+        .mb-1 { margin-bottom: 1rem; }
     </style>
 </head>
 <body>
-    <h1>Invoice Matcher</h1>
+    <h1>Invoice Matcher
+        <button class="btn-sm btn-outline settings-toggle" onclick="toggleSettings()">Settings</button>
+    </h1>
     <p class="subtitle">Match invoice PDFs against a master list using Gemini AI</p>
 
-    <div class="card">
-        <form id="scan-form">
-            <label for="api_key">Gemini API Key</label>
-            <input type="password" id="api_key" name="api_key" placeholder="AIza..." required>
+    <!-- Settings Card (collapsible) -->
+    <div class="card" id="settings-card" style="display:none;">
+        <h2 style="margin-bottom: 1rem;">Settings</h2>
+        <label>Gemini API Key</label>
+        <p class="help">Get a free key at <a href="https://aistudio.google.com/apikey" target="_blank">aistudio.google.com/apikey</a>. Saved locally on your computer.</p>
+        <div id="key-display" class="key-status" style="display:none;">
+            <span class="dot dot-green"></span>
+            <span>Key saved: <code id="masked-key"></code></span>
+            <button class="btn-sm btn-outline" onclick="showKeyForm()">Change</button>
+            <button class="btn-sm btn-danger-outline" onclick="deleteKey()">Remove</button>
+        </div>
+        <div id="key-form-wrapper">
+            <div class="key-form">
+                <input type="password" id="api_key_input" placeholder="AIzaSy..." style="margin-bottom:0;">
+                <button class="btn-sm btn-primary" onclick="saveKey()">Save</button>
+            </div>
+        </div>
+        <div id="key-message" style="margin-top: 0.5rem;"></div>
+    </div>
 
+    <!-- Main Form -->
+    <div class="card">
+        <div id="no-key-warning" class="error" style="display:none; margin-top:0; margin-bottom:1rem;">
+            No API key configured. Click <strong>Settings</strong> above to add your Gemini API key.
+        </div>
+        <form id="scan-form">
             <label for="directory">Directory Path</label>
             <p class="help">Full path to the folder containing your PDF files</p>
-            <input type="text" id="directory" name="directory" placeholder="/Users/you/invoices" required>
+            <div class="dir-input-row mb-1">
+                <input type="text" id="directory" name="directory" placeholder="/Users/you/invoices" required>
+                <label class="browse-btn" for="dir-picker" title="Browse for a file in the target folder">Browse</label>
+                <input type="file" id="dir-picker" style="display:none;" webkitdirectory>
+            </div>
 
             <label for="master_file">Master Invoice File</label>
             <p class="help">Filename of the master list within that directory</p>
@@ -102,9 +148,84 @@
     </div>
 
     <script>
+        // --- Settings ---
+        let hasKey = false;
+
+        async function loadSettings() {
+            try {
+                const resp = await fetch('/api/settings');
+                const data = await resp.json();
+                hasKey = data.has_key;
+                if (hasKey) {
+                    document.getElementById('masked-key').textContent = data.masked_key;
+                    document.getElementById('key-display').style.display = 'flex';
+                    document.getElementById('key-form-wrapper').style.display = 'none';
+                    document.getElementById('no-key-warning').style.display = 'none';
+                } else {
+                    document.getElementById('key-display').style.display = 'none';
+                    document.getElementById('key-form-wrapper').style.display = 'block';
+                    document.getElementById('no-key-warning').style.display = 'block';
+                    document.getElementById('settings-card').style.display = 'block';
+                }
+            } catch (e) { /* ignore */ }
+        }
+
+        function toggleSettings() {
+            const card = document.getElementById('settings-card');
+            card.style.display = card.style.display === 'none' ? 'block' : 'none';
+        }
+
+        function showKeyForm() {
+            document.getElementById('key-display').style.display = 'none';
+            document.getElementById('key-form-wrapper').style.display = 'block';
+            document.getElementById('api_key_input').value = '';
+            document.getElementById('api_key_input').focus();
+        }
+
+        async function saveKey() {
+            const key = document.getElementById('api_key_input').value.trim();
+            if (!key) return;
+            const msg = document.getElementById('key-message');
+            try {
+                const resp = await fetch('/api/settings/key', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ api_key: key }),
+                });
+                if (!resp.ok) throw new Error('Failed to save');
+                msg.innerHTML = '<span class="status status-saved">Key saved</span>';
+                setTimeout(() => { msg.innerHTML = ''; }, 2000);
+                loadSettings();
+            } catch (e) {
+                msg.innerHTML = '<span class="status status-unmatched">Failed to save key</span>';
+            }
+        }
+
+        async function deleteKey() {
+            try {
+                await fetch('/api/settings/key', { method: 'DELETE' });
+                loadSettings();
+            } catch (e) { /* ignore */ }
+        }
+
+        // --- Directory browser ---
         const dirInput = document.getElementById('directory');
         const masterSelect = document.getElementById('master_file');
         let debounceTimer;
+
+        document.getElementById('dir-picker').addEventListener('change', function(e) {
+            const files = e.target.files;
+            if (files.length > 0) {
+                // Extract directory path from the first file's webkitRelativePath
+                const relativePath = files[0].webkitRelativePath;
+                const folderName = relativePath.split('/')[0];
+                // We can't get the absolute path from browser — show a hint
+                dirInput.value = '';
+                dirInput.placeholder = 'Browser cannot access full path. Please paste the folder path manually.';
+                dirInput.focus();
+                alert('Due to browser security, the full folder path cannot be read automatically.\n\nPlease paste the full path to your folder in the text field.\n\nTip (Mac): Drag the folder from Finder into Terminal to see the path.');
+            }
+        });
 
         dirInput.addEventListener('input', () => {
             clearTimeout(debounceTimer);
@@ -123,8 +244,16 @@
             } catch (e) { /* ignore */ }
         }
 
+        // --- Scan ---
         document.getElementById('scan-form').addEventListener('submit', async (e) => {
             e.preventDefault();
+
+            if (!hasKey) {
+                document.getElementById('settings-card').style.display = 'block';
+                document.getElementById('api_key_input').focus();
+                return;
+            }
+
             const btn = document.getElementById('scan-btn');
             const loading = document.getElementById('loading');
             const errorBox = document.getElementById('error-box');
@@ -136,7 +265,6 @@
 
             try {
                 const body = {
-                    api_key: document.getElementById('api_key').value,
                     directory: document.getElementById('directory').value,
                     master_file: masterSelect.value,
                     pattern: document.getElementById('pattern').value || '{invoice}',
@@ -220,6 +348,9 @@
                     '<p class="error">' + err.message + '</p>';
             }
         });
+
+        // Load settings on page load
+        loadSettings();
     </script>
 </body>
 </html>
