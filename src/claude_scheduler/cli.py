@@ -640,6 +640,17 @@ def cmd_demo(args):
     record = not args.no_record
     to_gif = args.gif
 
+    if args.demo_name == "clear":
+        from claude_scheduler.demo.recorder import get_output_dir
+        demo_dir = get_output_dir()
+        count = 0
+        for f in demo_dir.iterdir():
+            if f.suffix in (".cast", ".gif", ".txt", ".mov", ".mp4"):
+                f.unlink()
+                count += 1
+        console.print(f"[green]Cleared {count} demo files from {demo_dir}[/green]")
+        return
+
     if args.demo_name == "all":
         paths = run_all_demos(record=record, workdir=workdir, to_gif=to_gif)
         if paths:
