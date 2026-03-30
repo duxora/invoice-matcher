@@ -7,5 +7,7 @@
 
 | ID | Time | T | Title | Read |
 |----|------|---|-------|------|
-| #20195 | 11:08 AM | 🟣 | Tools Hub Web Dashboard with Three Integrated Apps | ~421 |
+| #20160 | 11:05 AM | 🟣 | Telegram Bridge Plugin System Built | ~349 |
+| #20153 | " | 🟣 | Telegram Bridge Service with LaunchDaemon Integration | ~297 |
+| #20152 | " | 🟣 | Local Knowledge Base MCP Server Built | ~686 |
 </claude-mem-context>

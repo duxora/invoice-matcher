@@ -160,7 +160,7 @@ TRANSLATIONS = {
     },
 }
 
-DEFAULT_LANG = "vi"
+DEFAULT_LANG = "en"
 
 
 def get_translator(lang: str = "") -> Callable[[str], str]:

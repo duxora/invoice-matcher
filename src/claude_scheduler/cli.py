@@ -7,6 +7,12 @@ from pathlib import Path
 
 from rich.table import Table
 from rich.panel import Panel
+
+# Ensure project root is on sys.path so 'apps' package is importable
+_PROJECT_ROOT = str(Path(__file__).resolve().parent.parent.parent)
+if _PROJECT_ROOT not in sys.path:
+    sys.path.insert(0, _PROJECT_ROOT)
+
 from claude_scheduler import __version__
 from claude_scheduler.console import console
 from claude_scheduler.config import get_config, init_config
@@ -573,7 +579,7 @@ def cmd_journal_streak(args):
 
 def cmd_speak(args):
     from apps.speaking_coach.session import SpeakingSession
-    scenario = args.scenario or "free"
+    scenario = getattr(args, "scenario", None) or "free"
     session = SpeakingSession(scenario=scenario)
     opening = session.get_opening()
     console.print(f"[bold]Scenario: {session.scenario_info['name']}[/bold]")
@@ -629,12 +635,12 @@ def cmd_demo(args):
     workdir = str(Path(__file__).parent.parent.parent)  # automation-hub root
 
     if args.demo_name == "list":
-        t = Table(title="Available Demos")
-        t.add_column("Name")
-        t.add_column("Description")
+        print("\nAvailable Demos\n")
         for d in _list_demos():
-            t.add_row(d["key"], d["description"])
-        console.print(t)
+            print(f"  {d['key']:<12} {d['description']}")
+        print(f"\nUsage: cs demo <name> [--gif] [--no-record]")
+        print(f"       cs demo all    — run all demos")
+        print(f"       cs demo clear  — delete recorded files\n")
         return
 
     record = not args.no_record
@@ -873,7 +879,6 @@ def main():
     p = sp_sub.add_parser("progress", help="View speaking progress")
     p.set_defaults(func=cmd_speak_progress)
 
-    sp_parser.add_argument("--scenario", "-s", choices=["standup", "code_review", "presentation", "interview", "free"], default="free")
     sp_parser.set_defaults(func=cmd_speak)
 
     # kb (knowledge base)

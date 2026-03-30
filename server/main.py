@@ -25,3 +25,20 @@ async def portal(request: Request):
 from apps.scheduler.routes import router as scheduler_router
 register_app("Scheduler", "Claude task scheduler dashboard", "/scheduler", "📋")
 app.include_router(scheduler_router, prefix="/scheduler")
+
+from apps.local_kb.routes import router as kb_router
+register_app("Knowledge Base", "Local knowledge base with curated insights", "/kb", "📚")
+app.include_router(kb_router, prefix="/kb")
+
+from apps.telegram_bridge.routes import router as tg_router
+register_app("Telegram Bridge", "Two-way Telegram bot with plugin system", "/telegram-bridge", "🤖")
+app.include_router(tg_router, prefix="/telegram-bridge")
+
+try:
+    from apps.dev_workflow.routes import router as workflow_router
+    register_app("Dev Workflow", "Dev-to-deploy pipeline dashboard", "/workflow", "🔄")
+    app.include_router(workflow_router, prefix="/workflow")
+except Exception as e:
+    import traceback
+    print(f"[WARN] Failed to load dev_workflow app: {e}")
+    traceback.print_exc()

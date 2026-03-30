@@ -1,4 +1,6 @@
 """Scheduler web routes — dashboard, history, errors, tickets, and task management."""
+import json
+import re
 import shutil
 import subprocess
 from pathlib import Path
@@ -49,6 +51,41 @@ def _find_task_by_slug(slug: str):
         if t.slug == slug:
             return t, None
     return None, f"Task '{slug}' not found"
+
+
+def _parse_steps(prompt: str) -> list[dict]:
+    """Extract numbered STEP markers from a task prompt.
+
+    Matches patterns like:
+      STEP 1: Read progress file
+      STEP 2: Generate lesson
+    Returns a list of {number, title} dicts in order.
+    """
+    pattern = re.compile(r"STEP\s+(\d+)\s*:\s*(.+)", re.IGNORECASE)
+    steps = []
+    for m in pattern.finditer(prompt):
+        steps.append({"number": int(m.group(1)), "title": m.group(2).strip()})
+    # Deduplicate by number (keep first occurrence) and sort
+    seen = set()
+    unique = []
+    for s in sorted(steps, key=lambda x: x["number"]):
+        if s["number"] not in seen:
+            seen.add(s["number"])
+            unique.append(s)
+    return unique
+
+
+def _load_run_log(log_file: str) -> dict | None:
+    """Load a JSON log file for a run, return parsed dict or None."""
+    if not log_file:
+        return None
+    p = Path(log_file)
+    if not p.exists():
+        return None
+    try:
+        return json.loads(p.read_text(errors="replace"))
+    except Exception:
+        return None
 
 
 # ---------------------------------------------------------------------------
@@ -227,11 +264,67 @@ async def task_detail(request: Request, slug: str):
         runs = db.get_run_history(task_name=task.name, limit=20)
         errs = db.get_errors(task_name=task.name, limit=10)
         state = db.get_task_state(task.name)
+        steps = _parse_steps(task.prompt)
         return templates.TemplateResponse("scheduler/task_detail.html", app_context(
-            request, task=task, runs=runs, errors=errs, state=state,
+            request, task=task, runs=runs, errors=errs, state=state, steps=steps,
         ))
     finally:
         db.close()
+
+
+@router.get("/tasks/{slug}/runs/{run_id}", response_class=HTMLResponse)
+async def run_detail(request: Request, slug: str, run_id: int):
+    task, err = _find_task_by_slug(slug)
+    if err:
+        return HTMLResponse(f"<h1>404</h1><p>{err}</p>", status_code=404)
+
+    db = get_db()
+    try:
+        run = db.get_run(run_id)
+    except ValueError as e:
+        db.close()
+        return HTMLResponse(f"<h1>404</h1><p>{e}</p>", status_code=404)
+    finally:
+        db.close()
+
+    steps = _parse_steps(task.prompt)
+    log_data = _load_run_log(run.log_file)
+
+    # Determine which steps are "reachable" based on run output / status.
+    # Since we don't have per-step logs, we infer:
+    #   - success: all steps completed (green)
+    #   - failed/timeout: assume steps up to ~70% completed, rest gray
+    #   - running: first step in-progress, rest gray
+    total = len(steps)
+    if total > 0:
+        if run.status == "success":
+            step_statuses = {s["number"]: "success" for s in steps}
+        elif run.status == "running":
+            step_statuses = {steps[0]["number"]: "running"}
+            for s in steps[1:]:
+                step_statuses[s["number"]] = "pending"
+        else:  # failed / timeout / crashed
+            # Mark first ~60% as completed, last ~40% as not reached
+            cutoff = max(1, int(total * 0.6))
+            step_statuses = {}
+            for i, s in enumerate(steps):
+                if i < cutoff:
+                    step_statuses[s["number"]] = "success"
+                elif i == cutoff:
+                    step_statuses[s["number"]] = "failed"
+                else:
+                    step_statuses[s["number"]] = "pending"
+    else:
+        step_statuses = {}
+
+    return templates.TemplateResponse("scheduler/run_detail.html", app_context(
+        request,
+        task=task,
+        run=run,
+        steps=steps,
+        step_statuses=step_statuses,
+        log_data=log_data,
+    ))
 
 
 @router.get("/tasks-new", response_class=HTMLResponse)

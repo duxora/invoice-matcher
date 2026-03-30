@@ -48,8 +48,9 @@ def _install_launchd(port: int, cs_command: str):
     plist_dir.mkdir(parents=True, exist_ok=True)
     plist_path = plist_dir / f"{LABEL}.plist"
 
-    # Find the cs executable
-    cs_path = shutil.which("cs") or cs_command
+    # Use python -m for reliability (avoids PATH issues with pip-installed scripts)
+    import sys
+    python_path = sys.executable
 
     plist_content = f"""<?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN"
@@ -60,10 +61,12 @@ def _install_launchd(port: int, cs_command: str):
     <string>{LABEL}</string>
     <key>ProgramArguments</key>
     <array>
-        <string>/bin/zsh</string>
-        <string>-l</string>
-        <string>-c</string>
-        <string>{cs_path} serve --port {port}</string>
+        <string>{python_path}</string>
+        <string>-m</string>
+        <string>claude_scheduler.cli</string>
+        <string>serve</string>
+        <string>--port</string>
+        <string>{port}</string>
     </array>
     <key>RunAtLoad</key>
     <true/>

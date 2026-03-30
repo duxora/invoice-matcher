@@ -1,7 +1,10 @@
-"""Notification system — macOS alerts + persistent SQLite log."""
+"""Notification system — macOS alerts + Telegram + persistent SQLite log."""
+import logging
 import shutil
 import subprocess
 from .db import Database
+
+logger = logging.getLogger(__name__)
 
 _HAS_TERMINAL_NOTIFIER = shutil.which("terminal-notifier") is not None
 
@@ -53,6 +56,18 @@ def _log_notification(db: Database | None, task_name: str, severity: str,
          datetime.now(timezone.utc).isoformat(), action_cmd))
     db.conn.commit()
 
+def _send_telegram(text: str):
+    """Send notification to the Scheduler Telegram topic."""
+    try:
+        import sys
+        sys.path.insert(0, str(__import__("pathlib").Path.home()
+                                / "workspace" / "tools" / "telegram-bridge" / "src"))
+        from telegram_bridge.notify import send_to_scheduler
+        send_to_scheduler(text)
+    except Exception as e:
+        logger.warning("Telegram notification failed: %s", e)
+
+
 def notify_error(task_name: str, error_message: str,
                  attempt: int = 1, db: Database = None):
     title = "Claude Scheduler — Task Failed"
@@ -60,12 +75,14 @@ def notify_error(task_name: str, error_message: str,
     action = f"./cs errors --task '{task_name}'"
     _send_desktop(title, msg, "error", action)
     _log_notification(db, task_name, "error", title, msg, action)
+    _send_telegram(f"❌ *{task_name}* failed (attempt {attempt})\n{error_message[:200]}")
 
 def notify_success(task_name: str, db: Database = None):
     title = "Claude Scheduler"
     msg = f"{task_name} completed successfully"
     _send_desktop(title, msg, "info")
     _log_notification(db, task_name, "info", title, msg)
+    _send_telegram(f"✅ *{task_name}* completed successfully")
 
 def notify_ticket(task_name: str, ticket_id: int, db: Database = None):
     title = "Claude Scheduler — Action Needed"
@@ -73,3 +90,4 @@ def notify_ticket(task_name: str, ticket_id: int, db: Database = None):
     action = f"./cs remediate {ticket_id}"
     _send_desktop(title, msg, "action", action)
     _log_notification(db, task_name, "action", title, msg, action)
+    _send_telegram(f"⚠️ *{task_name}*: ticket #{ticket_id} needs your input")

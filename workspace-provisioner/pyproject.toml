@@ -1,0 +1,17 @@
+[build-system]
+requires = ["setuptools>=68.0"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "workspace-provisioner"
+version = "0.1.0"
+description = "Provision Google Workspace domains via GoDaddy DNS and create users"
+requires-python = ">=3.11"
+dependencies = [
+    "google-api-python-client>=2.100.0",
+    "google-auth>=2.25.0",
+    "requests>=2.31.0",
+]
+
+[project.scripts]
+wsp = "provision:main"

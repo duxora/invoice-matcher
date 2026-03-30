@@ -69,6 +69,43 @@
         {% endfor %}
       </div>
       {% endif %}
+      {% if request.url.path.startswith(app.prefix) and app.prefix == '/kb' %}
+      <div class="ml-4 border-l border-hub-border">
+        {% set kb_links = [
+          ("Dashboard", "/kb/"),
+          ("Sources", "/kb/sources"),
+        ] %}
+        {% for label, href in kb_links %}
+        <a href="{{ href }}"
+           class="block px-3 py-1.5 text-xs transition-colors
+                  {% if request.url.path == href %}
+                    text-hub-accent
+                  {% else %}
+                    text-hub-muted hover:text-hub-text
+                  {% endif %}">
+          {{ label }}
+        </a>
+        {% endfor %}
+      </div>
+      {% endif %}
+      {% if request.url.path.startswith(app.prefix) and app.prefix == '/workflow' %}
+      <div class="ml-4 border-l border-hub-border">
+        {% set wf_links = [
+          ("Dashboard", "/workflow/"),
+        ] %}
+        {% for label, href in wf_links %}
+        <a href="{{ href }}"
+           class="block px-3 py-1.5 text-xs transition-colors
+                  {% if request.url.path == href %}
+                    text-hub-accent
+                  {% else %}
+                    text-hub-muted hover:text-hub-text
+                  {% endif %}">
+          {{ label }}
+        </a>
+        {% endfor %}
+      </div>
+      {% endif %}
       {% endfor %}
     </nav>
     <div class="px-5 py-3 border-t border-hub-border text-xs text-hub-muted">

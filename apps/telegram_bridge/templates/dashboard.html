@@ -1,0 +1,146 @@
+{% extends "base.html" %}
+
+{% block title %}Telegram Bridge{% endblock %}
+
+{% block content %}
+<!-- Header -->
+<div class="flex items-center justify-between mb-6">
+  <h1 class="text-2xl font-bold">🤖 Telegram Bridge</h1>
+  <div class="flex gap-2">
+    <button class="btn btn-primary"
+            hx-post="/telegram-bridge/restart"
+            hx-target="#restart-status"
+            hx-swap="innerHTML"
+            hx-confirm="Restart the Telegram bot?">
+      🔄 Restart
+    </button>
+  </div>
+</div>
+
+<div id="restart-status" class="mb-4"></div>
+
+<!-- Stats Row -->
+<div class="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
+  <div class="bg-hub-card border border-hub-border rounded-lg p-4">
+    <div class="text-hub-muted text-xs uppercase tracking-wide mb-1">Status</div>
+    <div class="text-2xl font-bold {{ 'text-green-400' if running else 'text-red-400' }}"
+         hx-get="/telegram-bridge/partials/status"
+         hx-trigger="every 10s"
+         hx-swap="innerHTML">
+      {{ 'Running' if running else 'Stopped' }}
+    </div>
+  </div>
+  <div class="bg-hub-card border border-hub-border rounded-lg p-4">
+    <div class="text-hub-muted text-xs uppercase tracking-wide mb-1">Plugins</div>
+    <div class="text-2xl font-bold text-hub-accent">{{ plugins | length }}</div>
+  </div>
+  <div class="bg-hub-card border border-hub-border rounded-lg p-4">
+    <div class="text-hub-muted text-xs uppercase tracking-wide mb-1">Commands</div>
+    <div class="text-2xl font-bold text-hub-accent">{{ total_commands }}</div>
+  </div>
+  <div class="bg-hub-card border border-hub-border rounded-lg p-4">
+    <div class="text-hub-muted text-xs uppercase tracking-wide mb-1">Service</div>
+    <div class="text-sm font-mono text-hub-muted mt-1">launchd</div>
+  </div>
+</div>
+
+<!-- Two Column Layout -->
+<div class="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
+  <!-- Plugins -->
+  <div class="bg-hub-card border border-hub-border rounded-lg">
+    <div class="px-4 py-3 border-b border-hub-border">
+      <h2 class="text-lg font-semibold">🧩 Registered Plugins</h2>
+    </div>
+    <div class="p-4">
+      {% if plugins %}
+      <table class="data-table">
+        <thead>
+          <tr>
+            <th>Plugin</th>
+            <th>Commands</th>
+            <th>File</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for p in plugins %}
+          <tr>
+            <td class="font-medium">{{ p.name }}</td>
+            <td>
+              {% for cmd in p.commands %}
+              <code class="text-xs text-hub-accent">{{ cmd }}</code>{{ ' ' if not loop.last }}
+              {% endfor %}
+            </td>
+            <td class="text-xs text-hub-muted">{{ p.path | replace(home_dir, '~') }}</td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+      {% else %}
+      <p class="text-hub-muted text-sm">No plugins loaded.</p>
+      {% endif %}
+    </div>
+  </div>
+
+  <!-- Bot Info -->
+  <div class="bg-hub-card border border-hub-border rounded-lg">
+    <div class="px-4 py-3 border-b border-hub-border">
+      <h2 class="text-lg font-semibold">ℹ️ Bot Configuration</h2>
+    </div>
+    <div class="p-4">
+      <dl class="space-y-3 text-sm">
+        <dt class="text-hub-muted">Bot Username</dt>
+        <dd class="font-medium">@raikuna_dd_bot</dd>
+        <dt class="text-hub-muted mt-2">Chat ID</dt>
+        <dd class="font-mono">2010918973</dd>
+        <dt class="text-hub-muted mt-2">Launchd Service</dt>
+        <dd class="font-mono">com.ducduong.telegram-bridge</dd>
+        <dt class="text-hub-muted mt-2">Log File</dt>
+        <dd class="font-mono text-xs">~/.local/log/telegram-bridge.err</dd>
+        <dt class="text-hub-muted mt-2">Plugin Directory</dt>
+        <dd class="font-mono text-xs">telegram-bridge/src/telegram_bridge/plugins/</dd>
+      </dl>
+    </div>
+  </div>
+</div>
+
+<!-- Command Reference -->
+<div class="bg-hub-card border border-hub-border rounded-lg mb-6">
+  <div class="px-4 py-3 border-b border-hub-border">
+    <h2 class="text-lg font-semibold">📖 Command Reference</h2>
+  </div>
+  <div class="p-4">
+    <table class="data-table">
+      <thead>
+        <tr>
+          <th>Command</th>
+          <th>Plugin</th>
+          <th>Description</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for cmd in all_commands %}
+        <tr>
+          <td><code class="text-hub-accent">{{ cmd.name }}</code></td>
+          <td><span class="badge badge-running">{{ cmd.plugin }}</span></td>
+          <td class="text-hub-muted">{{ cmd.description }}</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+
+<!-- Logs -->
+<div class="bg-hub-card border border-hub-border rounded-lg">
+  <div class="px-4 py-3 border-b border-hub-border flex items-center justify-between">
+    <h2 class="text-lg font-semibold">📜 Recent Logs</h2>
+    <span class="htmx-indicator text-hub-muted text-sm">Refreshing...</span>
+  </div>
+  <div class="p-4"
+       hx-get="/telegram-bridge/partials/logs"
+       hx-trigger="every 10s"
+       hx-swap="innerHTML">
+    <pre class="text-xs text-hub-muted bg-hub-bg rounded p-3 overflow-x-auto max-h-80 overflow-y-auto">{{ logs }}</pre>
+  </div>
+</div>
+{% endblock %}

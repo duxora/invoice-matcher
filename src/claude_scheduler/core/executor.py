@@ -9,9 +9,27 @@ from .models import Task
 
 LOCK_DIR = Path.home() / ".claude-scheduler" / "locks"
 
+def _find_claude() -> str:
+    """Find the claude CLI binary, checking common locations."""
+    import shutil
+    # Check PATH first
+    found = shutil.which("claude")
+    if found:
+        return found
+    # Common install locations
+    for path in [
+        os.path.expanduser("~/.local/bin/claude"),
+        os.path.expanduser("~/.claude/bin/claude"),
+        "/usr/local/bin/claude",
+    ]:
+        if os.path.isfile(path) and os.access(path, os.X_OK):
+            return path
+    return "claude"  # fallback, will raise FileNotFoundError
+
+
 def build_claude_command(task: Task) -> list[str]:
     return [
-        "claude", "-p", task.prompt,
+        _find_claude(), "-p", task.prompt,
         "--allowedTools", task.tools,
         "--max-turns", str(task.max_turns),
         "--model", task.model,

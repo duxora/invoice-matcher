@@ -54,7 +54,7 @@ async def dashboard(
     if not conn:
         return templates.TemplateResponse("dashboard.html", app_context(
             request, tasks=[], phases={}, projects=[], project_list=[],
-            selected_project=None, search_query="", error="backlog.db not found"
+            all_summary={}, selected_project=None, search_query="", error="backlog.db not found"
         ))
 
     try:
@@ -146,6 +146,14 @@ async def dashboard(
             ORDER BY p.name
         """).fetchall()
 
+        # Calculate aggregate totals for "All" view
+        all_summary = conn.execute("""
+            SELECT SUM(CASE WHEN status = 'open' THEN 1 ELSE 0 END) as open_count,
+                   SUM(CASE WHEN status = 'in_progress' THEN 1 ELSE 0 END) as in_progress_count,
+                   SUM(CASE WHEN status = 'done' THEN 1 ELSE 0 END) as done_count
+            FROM tasks
+        """).fetchone()
+
         # Compute phases
         phases = {
             "intake": 0, "backlog": 0, "implement": 0, "pr_ci": 0,
@@ -171,6 +179,7 @@ async def dashboard(
             phases=phases,
             projects=[dict(s) for s in summary],
             project_list=[dict(p) for p in project_list],
+            all_summary=dict(all_summary) if all_summary else {},
             selected_project=project,
             selected_status=status,
             search_query=q or "",
@@ -180,7 +189,7 @@ async def dashboard(
         conn.close()
         return templates.TemplateResponse("dashboard.html", app_context(
             request, tasks=[], phases={}, projects=[], project_list=[],
-            selected_project=None, selected_status=None, search_query="", error=str(e)
+            all_summary={}, selected_project=None, selected_status=None, search_query="", error=str(e)
         ))
 
 

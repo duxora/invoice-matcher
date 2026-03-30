@@ -33,9 +33,18 @@
   <!-- Project summary cards (compact inline) -->
   <div class="flex flex-wrap gap-2">
     <a href="/workflow/"
-       class="flex items-center gap-2 px-3 py-1.5 rounded-lg border text-xs cursor-pointer
+       class="flex items-center gap-3 px-3 py-1.5 rounded-lg border text-xs cursor-pointer
               {% if not selected_project %}bg-hub-accent/10 border-hub-accent text-hub-accent{% else %}bg-hub-card border-hub-border text-hub-muted hover:border-hub-accent hover:text-hub-text{% endif %}">
-      All
+      <span class="font-medium">All</span>
+      {% if all_summary %}
+      <span class="flex items-center gap-1.5">
+        <span class="text-blue-400 font-semibold">{{ all_summary.open_count or 0 }}</span>
+        <span class="text-hub-border">/</span>
+        <span class="text-amber-400 font-semibold">{{ all_summary.in_progress_count or 0 }}</span>
+        <span class="text-hub-border">/</span>
+        <span class="text-green-400 font-semibold">{{ all_summary.done_count or 0 }}</span>
+      </span>
+      {% endif %}
     </a>
     {% for p in projects %}
     <a href="/workflow/?project={{ p.project_id }}"

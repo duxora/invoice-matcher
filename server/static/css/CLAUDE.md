@@ -7,5 +7,6 @@
 
 | ID | Time | T | Title | Read |
 |----|------|---|-------|------|
-| #20195 | 11:08 AM | 🟣 | Tools Hub Web Dashboard with Three Integrated Apps | ~421 |
+| #20234 | 11:12 AM | 🟣 | Knowledge Base Web UI in Automation Hub | ~368 |
+| #20231 | 11:11 AM | 🟣 | Telegram Bridge Web Dashboard in Automation Hub | ~326 |
 </claude-mem-context>
