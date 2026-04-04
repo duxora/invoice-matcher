@@ -227,7 +227,13 @@
       </button>
     </div>
 
-    <div id="task-list">
+    <div
+      id="task-list"
+      hx-sse="connect: /workflow/api/task-updates{% if selected_project %}?project={{ selected_project }}{% endif %}{% if selected_status %}&status={{ selected_status }}{% endif %}"
+      hx-trigger="sse:task-update"
+      hx-swap="innerHTML"
+      hx-on="htmx:sseError: console.error('SSE error');"
+    >
       {% for task in tasks %}
       <div class="border-b border-hub-border/50 task-row" data-phase="{{ task.phase }}">
       <div class="px-5 py-3 hover:bg-hub-bg/30 cursor-pointer" onclick="toggleTaskDetail({{ task.id }}, this)">

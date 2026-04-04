@@ -1,13 +1,16 @@
 """Dev Workflow — dashboard routes for visualizing the dev-to-deploy pipeline."""
+import asyncio
+import hashlib
 import json as jsonlib
 import os
 import sqlite3
 import subprocess
+import time
 from pathlib import Path
 from typing import Optional
 
 from fastapi import APIRouter, Query, Request
-from fastapi.responses import HTMLResponse, JSONResponse
+from fastapi.responses import HTMLResponse, JSONResponse, StreamingResponse
 from fastapi.templating import Jinja2Templates
 from jinja2 import ChoiceLoader, FileSystemLoader
 
@@ -93,8 +96,8 @@ async def dashboard(
             status_filter = f" AND t.status IN ({placeholders})"
             extra_params = list(statuses) + extra_params
         else:
-            status_filter = " AND t.status IN (?, ?)"
-            extra_params = ["open", "in_progress"] + extra_params
+            status_filter = " AND t.status IN (?, ?, ?)"
+            extra_params = ["open", "in_progress", "backlog"] + extra_params
 
         # Fetch tasks matching filters
         tasks = conn.execute(f"""
@@ -261,6 +264,183 @@ async def api_dashboard():
 
     conn.close()
     return JSONResponse([dict(r) for r in rows])
+
+
+# ── Server-Sent Events for real-time updates ───────────────────────────────────
+
+def _get_task_list_hash(project: Optional[str] = None, status: Optional[str] = None) -> str:
+    """Compute hash of task list to detect changes."""
+    conn = get_tkt_db()
+    if not conn:
+        return ""
+
+    conditions = []
+    params = []
+
+    if status:
+        statuses = [s.strip() for s in status.split(",")]
+        placeholders = ",".join("?" for _ in statuses)
+        conditions.append(f"t.status IN ({placeholders})")
+        params.extend(statuses)
+    else:
+        conditions.append("t.status IN (?, ?, ?)")
+        params = ["open", "in_progress", "backlog"]
+
+    if project:
+        conditions.append("t.project_id = ?")
+        params.append(project)
+
+    where = f"WHERE {' AND '.join(conditions)}" if conditions else ""
+
+    rows = conn.execute(f"""
+        SELECT t.id, t.updated_at, t.status
+        FROM tasks t
+        {where}
+        ORDER BY t.updated_at DESC
+    """, params).fetchall()
+
+    conn.close()
+
+    # Hash the task IDs and their update times to detect any change
+    data = "|".join(f"{r['id']}:{r['updated_at']}" for r in rows)
+    return hashlib.md5(data.encode()).hexdigest()
+
+
+def _render_task_row(task: dict) -> str:
+    """Render a single task row as HTML fragment for HTMX swap."""
+    status_colors = {
+        "open": "text-blue-400",
+        "in_progress": "text-amber-400",
+        "done": "text-green-400"
+    }
+    prio_colors = {
+        "critical": "bg-red-600 text-white",
+        "high": "bg-orange-500 text-white",
+        "medium": "bg-yellow-600 text-white",
+        "low": "bg-gray-600 text-gray-200"
+    }
+
+    status_color = status_colors.get(task.get("status"), "text-hub-muted")
+    prio_color = prio_colors.get(task.get("priority"), "bg-gray-700 text-gray-300")
+
+    pr_link = ""
+    if task.get("pr_number"):
+        pr_link = f'<a href="https://github.com/c0x12c-internal/service-insight/pull/{task["pr_number"]}" target="_blank" class="text-[10px] text-hub-accent hover:underline">PR #{task["pr_number"]}</a>'
+
+    domain_badge = f'<span class="text-[10px] text-hub-muted bg-hub-bg px-1.5 py-0.5 rounded">{task.get("domain")}</span>' if task.get("domain") else ""
+
+    return f'''<div class="border-b border-hub-border/50 task-row" data-phase="{task.get('phase', 'backlog')}">
+  <div class="px-5 py-3 hover:bg-hub-bg/30 cursor-pointer" onclick="toggleTaskDetail({task['id']}, this)">
+    <div class="flex items-start gap-3">
+      <input type="checkbox" data-task-id="{task['id']}" onchange="event.stopPropagation(); updateBulkBar()"
+        onclick="event.stopPropagation()"
+        class="task-checkbox w-3.5 h-3.5 mt-0.5 rounded border-hub-border accent-hub-accent cursor-pointer shrink-0" />
+      <span class="text-xs font-mono text-hub-muted mt-0.5 shrink-0">#{task['id']}</span>
+      <div class="flex-1 min-w-0">
+        <div class="flex items-start justify-between gap-2">
+          <p class="text-sm text-hub-text leading-snug">{task.get('title', '')}</p>
+          {'<button onclick="event.stopPropagation(); openSessionModal(' + str(task['id']) + ', \'' + task.get('title', '').replace("'", "\\'") + '\', \'' + task.get('project_id', '') + '\')" class="shrink-0 px-2 py-1 text-[10px] font-medium bg-hub-accent/10 text-hub-accent border border-hub-accent/30 rounded hover:bg-hub-accent/20 cursor-pointer" title="Launch Claude Code session">▶ Claude</button>' if task.get('status') != 'done' else ''}
+        </div>
+        <div class="flex items-center gap-2 mt-1.5 flex-wrap">
+          <span class="text-[10px] font-semibold uppercase px-1.5 py-0.5 rounded {prio_color}">{task.get('priority', 'low')}</span>
+          <span class="text-[10px] {status_color}">{task.get('status', 'open').replace('_', ' ')}</span>
+          <span class="text-[10px] text-hub-muted">{task.get('project_name', '')}</span>
+          {domain_badge}
+          {pr_link}
+        </div>
+      </div>
+    </div>
+  </div>
+  <div id="task-detail-{task['id']}" class="hidden bg-hub-bg/50 border-t border-hub-border/30">
+    <div class="px-5 py-3 text-xs text-hub-muted">Loading...</div>
+  </div>
+</div>'''
+
+
+@router.get("/api/task-updates")
+async def task_updates(project: Optional[str] = Query(None), status: Optional[str] = Query(None)):
+    """SSE endpoint for real-time task list updates."""
+
+    async def event_generator():
+        last_hash = ""
+        poll_interval = 2  # seconds
+
+        while True:
+            try:
+                await asyncio.sleep(poll_interval)
+
+                # Check if task list has changed
+                current_hash = _get_task_list_hash(project, status)
+                if current_hash == last_hash or not current_hash:
+                    continue
+
+                last_hash = current_hash
+
+                # Fetch full task list to send updates
+                conn = get_tkt_db()
+                if not conn:
+                    continue
+
+                conditions = []
+                params = []
+
+                if status:
+                    statuses = [s.strip() for s in status.split(",")]
+                    placeholders = ",".join("?" for _ in statuses)
+                    conditions.append(f"t.status IN ({placeholders})")
+                    params.extend(statuses)
+                else:
+                    conditions.append("t.status IN (?, ?, ?)")
+                    params = ["open", "in_progress", "backlog"]
+
+                if project:
+                    conditions.append("t.project_id = ?")
+                    params.append(project)
+
+                where = f"WHERE {' AND '.join(conditions)}" if conditions else ""
+
+                rows = conn.execute(f"""
+                    SELECT t.id, t.project_id, p.name as project_name,
+                           t.title, t.type, t.priority, t.status,
+                           t.domain, t.pr_number, t.branch,
+                           t.created_at, t.updated_at, t.completed_at
+                    FROM tasks t
+                    JOIN projects p ON t.project_id = p.id
+                    {where}
+                    ORDER BY
+                        CASE t.priority
+                            WHEN 'critical' THEN 0
+                            WHEN 'high' THEN 1
+                            WHEN 'medium' THEN 2
+                            WHEN 'low' THEN 3
+                        END,
+                        t.created_at DESC
+                    LIMIT 300
+                """, params).fetchall()
+
+                conn.close()
+
+                # Render task list
+                task_list_html = ""
+                for r in rows:
+                    task = dict(r)
+                    task["phase"] = _detect_phase(task)
+                    task_list_html += _render_task_row(task)
+
+                # Send SSE event with task list
+                # HTMX expects the HTML directly in the data field
+                yield f"event: task-update\n"
+                # Escape newlines in HTML for SSE format
+                escaped_html = task_list_html.replace("\n", " ")
+                yield f"data: {escaped_html}\n\n"
+
+            except asyncio.CancelledError:
+                break
+            except Exception as e:
+                print(f"[ERROR] task-updates: {e}")
+                await asyncio.sleep(5)
+
+    return StreamingResponse(event_generator(), media_type="text/event-stream")
 
 
 # ── Claude Code Sessions ─────────────────────────────────────────────────────
@@ -754,7 +934,7 @@ async def api_bulk_move_tasks(request: Request):
     return JSONResponse({"ok": True, "moved": moved})
 
 
-VALID_STATUSES = {"open", "in_progress", "done"}
+VALID_STATUSES = {"open", "in_progress", "done", "backlog"}
 VALID_PRIORITIES = {"critical", "high", "medium", "low"}
 
 
@@ -860,6 +1040,8 @@ def _detect_phase(task) -> str:
     pr = task["pr_number"]
     if status == "done":
         return "close"
+    if status == "backlog":
+        return "backlog"
     if pr:
         return "pr_ci"
     if status == "in_progress":
