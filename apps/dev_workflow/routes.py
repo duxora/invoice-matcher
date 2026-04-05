@@ -55,6 +55,12 @@ async def dashboard(
     status: Optional[str] = Query(None),
     q: Optional[str] = Query(None),
 ):
+    # Serve React SPA if frontend build exists
+    from pathlib import Path as _P
+    _dist = _P(__file__).parent / "frontend" / "dist" / "index.html"
+    if _dist.exists():
+        from starlette.responses import FileResponse
+        return FileResponse(str(_dist))
     conn = get_tkt_db()
     if not conn:
         return templates.TemplateResponse("dashboard.html", app_context(
