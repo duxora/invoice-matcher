@@ -33,7 +33,14 @@ app.include_router(tg_router, prefix="/telegram-bridge")
 
 try:
     from apps.dev_workflow.routes import router as workflow_router
+    from fastapi.responses import RedirectResponse
     register_app("Dev Workflow", "Dev-to-deploy pipeline dashboard", "/workflow", "🔄")
+
+    # Redirect /workflow → /workflow/ (FastAPI doesn't auto-redirect for router prefixes)
+    @app.get("/workflow", include_in_schema=False)
+    async def workflow_redirect():
+        return RedirectResponse("/workflow/", status_code=307)
+
     app.include_router(workflow_router, prefix="/workflow")
 except Exception as e:
     import traceback

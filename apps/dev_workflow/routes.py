@@ -14,7 +14,7 @@ from typing import Optional
 from fastapi import APIRouter, Query, Request
 from fastapi.responses import JSONResponse, StreamingResponse
 
-router = APIRouter()
+router = APIRouter(redirect_slashes=True)
 
 # tkt database path
 TKT_DB_PATH = Path.home() / ".backlog" / "backlog.db"
