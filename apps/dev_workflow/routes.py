@@ -12,19 +12,9 @@ from pathlib import Path
 from typing import Optional
 
 from fastapi import APIRouter, Query, Request
-from fastapi.responses import HTMLResponse, JSONResponse, StreamingResponse
-from fastapi.templating import Jinja2Templates
-from jinja2 import ChoiceLoader, FileSystemLoader
+from fastapi.responses import JSONResponse, StreamingResponse
 
 router = APIRouter()
-APP_TEMPLATES = Path(__file__).parent / "templates"
-SERVER_TEMPLATES = Path(__file__).parent.parent.parent / "server" / "templates"
-
-templates = Jinja2Templates(directory=str(APP_TEMPLATES))
-templates.env.loader = ChoiceLoader([
-    FileSystemLoader(str(APP_TEMPLATES)),
-    FileSystemLoader(str(SERVER_TEMPLATES)),
-])
 
 # tkt database path
 TKT_DB_PATH = Path.home() / ".backlog" / "backlog.db"
@@ -38,173 +28,10 @@ def get_tkt_db() -> Optional[sqlite3.Connection]:
     return conn
 
 
-def app_context(request: Request, **kwargs):
-    try:
-        from claude_scheduler.web.app import APPS
-    except ImportError:
-        from server.main import APPS
-    return {"request": request, "apps": APPS, **kwargs}
+# ── Dashboard page (now served by React SPA at frontend/dist/) ───────────────
 
 
-# ── Dashboard page ───────────────────────────────────────────────────────────
-
-@router.get("/", response_class=HTMLResponse)
-async def dashboard(
-    request: Request,
-    project: Optional[str] = Query(None),
-    status: Optional[str] = Query(None),
-    q: Optional[str] = Query(None),
-):
-    # Serve React SPA if frontend build exists
-    from pathlib import Path as _P
-    _dist = _P(__file__).parent / "frontend" / "dist" / "index.html"
-    if _dist.exists():
-        from starlette.responses import FileResponse
-        return FileResponse(str(_dist))
-    conn = get_tkt_db()
-    if not conn:
-        return templates.TemplateResponse("dashboard.html", app_context(
-            request, tasks=[], phases={}, projects=[], project_list=[],
-            all_summary={}, selected_project=None, search_query="", error="backlog.db not found"
-        ))
-
-    try:
-        # Fetch all project IDs for the filter dropdown
-        project_list = conn.execute("""
-            SELECT id, name FROM projects WHERE archived_at IS NULL ORDER BY name
-        """).fetchall()
-
-        extra_filters = ""
-        extra_params: list = []
-        if project:
-            extra_filters += " AND t.project_id = ?"
-            extra_params.append(project)
-
-        # Search filter: exact ID match (numeric) or LIKE on title/description
-        if q and q.strip():
-            q_stripped = q.strip()
-            if q_stripped.isdigit():
-                extra_filters += " AND (t.id = ? OR LOWER(t.title) LIKE ? OR LOWER(COALESCE(t.description, '')) LIKE ?)"
-                extra_params.extend([int(q_stripped), f"%{q_stripped.lower()}%", f"%{q_stripped.lower()}%"])
-            else:
-                extra_filters += " AND (LOWER(t.title) LIKE ? OR LOWER(COALESCE(t.description, '')) LIKE ?)"
-                extra_params.extend([f"%{q_stripped.lower()}%", f"%{q_stripped.lower()}%"])
-
-        # Determine which statuses to show
-        # Default: open + in_progress (exclude done)
-        # "all" shows everything, or comma-separated like "open,in_progress,done"
-        show_done = False
-        if status and status == "all":
-            status_filter = ""
-            show_done = True
-        elif status:
-            statuses = [s.strip() for s in status.split(",")]
-            show_done = "done" in statuses
-            placeholders = ",".join("?" for _ in statuses)
-            status_filter = f" AND t.status IN ({placeholders})"
-            extra_params = list(statuses) + extra_params
-        else:
-            status_filter = " AND t.status IN (?, ?, ?)"
-            extra_params = ["open", "in_progress", "backlog"] + extra_params
-
-        # Fetch tasks matching filters
-        tasks = conn.execute(f"""
-            SELECT t.id, t.project_id, p.name as project_name,
-                   t.title, t.type, t.priority, t.status,
-                   t.domain, t.pr_number, t.branch,
-                   t.created_at, t.updated_at, t.completed_at
-            FROM tasks t
-            JOIN projects p ON t.project_id = p.id
-            WHERE 1=1 {status_filter} {extra_filters}
-            ORDER BY
-                CASE t.priority
-                    WHEN 'critical' THEN 0
-                    WHEN 'high' THEN 1
-                    WHEN 'medium' THEN 2
-                    WHEN 'low' THEN 3
-                END,
-                t.created_at DESC
-            LIMIT 300
-        """, extra_params).fetchall()
-
-        # Only fetch recent done if done is included or status=all
-        recent = []
-        if show_done:
-            done_params = [p for p in extra_params if p not in ("open", "in_progress", "done")]
-            recent = conn.execute(f"""
-                SELECT t.id, t.project_id, p.name as project_name,
-                       t.title, t.type, t.priority, t.status,
-                       t.domain, t.pr_number, t.branch,
-                       t.created_at, t.updated_at, t.completed_at
-                FROM tasks t
-                JOIN projects p ON t.project_id = p.id
-                WHERE t.status = 'done'
-                  AND t.completed_at > datetime('now', '-7 days')
-                  {extra_filters.replace('AND t.project_id = ?', 'AND t.project_id = ?') if project else ''}
-                ORDER BY t.completed_at DESC
-            """, [project] if project else []).fetchall()
-
-        # Dashboard summary
-        summary = conn.execute("""
-            SELECT p.id as project_id, p.name as project_name,
-                   SUM(CASE WHEN t.status = 'open' THEN 1 ELSE 0 END) as open_count,
-                   SUM(CASE WHEN t.status = 'in_progress' THEN 1 ELSE 0 END) as in_progress_count,
-                   SUM(CASE WHEN t.status = 'done' THEN 1 ELSE 0 END) as done_count
-            FROM projects p
-            LEFT JOIN tasks t ON t.project_id = p.id
-            WHERE p.archived_at IS NULL
-            GROUP BY p.id
-            ORDER BY p.name
-        """).fetchall()
-
-        # Calculate aggregate totals for "All" view
-        all_summary = conn.execute("""
-            SELECT SUM(CASE WHEN status = 'open' THEN 1 ELSE 0 END) as open_count,
-                   SUM(CASE WHEN status = 'in_progress' THEN 1 ELSE 0 END) as in_progress_count,
-                   SUM(CASE WHEN status = 'done' THEN 1 ELSE 0 END) as done_count
-            FROM tasks
-        """).fetchone()
-
-        # Compute phases
-        phases = {
-            "intake": 0, "backlog": 0, "implement": 0, "pr_ci": 0,
-            "review": 0, "deploy": 0, "verify": 0, "close": 0,
-        }
-        all_tasks = []
-        for t in tasks:
-            task = dict(t)
-            task["phase"] = _detect_phase(t)
-            phases[task["phase"]] += 1
-            all_tasks.append(task)
-
-        for t in recent:
-            task = dict(t)
-            task["phase"] = "close"
-            phases["close"] += 1
-            all_tasks.append(task)
-
-        conn.close()
-        return templates.TemplateResponse("dashboard.html", app_context(
-            request,
-            tasks=all_tasks,
-            phases=phases,
-            projects=[dict(s) for s in summary],
-            project_list=[dict(p) for p in project_list],
-            all_summary=dict(all_summary) if all_summary else {},
-            selected_project=project,
-            selected_status=status,
-            search_query=q or "",
-            error=None,
-        ))
-    except Exception as e:
-        conn.close()
-        return templates.TemplateResponse("dashboard.html", app_context(
-            request, tasks=[], phases={}, projects=[], project_list=[],
-            all_summary={}, selected_project=None, selected_status=None, search_query="", error=str(e)
-        ))
-
-
-# ── JSON API for HTMX/JS ────────────────────────────────────────────────────
+# ── JSON API ─────────────────────────────────────────────────────────────────
 
 @router.get("/api/tasks", response_class=JSONResponse)
 async def api_tasks(
@@ -1153,24 +980,20 @@ def _detect_phase(task) -> str:
     return "backlog"
 
 
-# ── SPA Static File Serving ──────────────────────────────────────────────────
+# ── SPA catch-all for non-API routes ─────────────────────────────────────────
+# React Router handles /workflow, /workflow/pipelines, /workflow/sessions etc.
 
-from pathlib import Path as _Path
 from starlette.responses import FileResponse as _FileResponse
 
-_FRONTEND_DIST = _Path(__file__).parent / "frontend" / "dist"
+_SPA_INDEX = Path(__file__).parent.parent.parent / "frontend" / "dist" / "index.html"
 
-if _FRONTEND_DIST.exists():
-    from starlette.staticfiles import StaticFiles as _StaticFiles
 
-    _assets_dir = _FRONTEND_DIST / "assets"
-    if _assets_dir.exists():
-        router.mount("/assets", _StaticFiles(directory=str(_assets_dir)), name="workflow-assets")
+@router.get("/", include_in_schema=False)
+@router.get("/{path:path}", include_in_schema=False)
+async def workflow_spa_fallback(request: Request, path: str = ""):
+    """Serve the React SPA for all non-API workflow routes."""
+    if _SPA_INDEX.exists():
+        return _FileResponse(str(_SPA_INDEX))
+    return JSONResponse({"error": "SPA not built. Run: cd frontend && pnpm build"}, status_code=503)
 
-    @router.get("/{path:path}", response_class=_FileResponse)
-    async def serve_spa(path: str):
-        """Serve the React SPA for all non-API routes."""
-        file_path = _FRONTEND_DIST / path
-        if file_path.is_file() and _FRONTEND_DIST in file_path.resolve().parents:
-            return _FileResponse(str(file_path))
-        return _FileResponse(str(_FRONTEND_DIST / "index.html"))
+

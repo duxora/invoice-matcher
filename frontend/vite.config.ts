@@ -8,9 +8,11 @@ export default defineConfig({
     port: 5173,
     proxy: {
       '/workflow/api': 'http://localhost:7070',
+      '/scheduler/api': 'http://localhost:7070',
+      '/kb/api': 'http://localhost:7070',
+      '/telegram-bridge/api': 'http://localhost:7070',
     },
   },
-  base: '/workflow/',
   build: {
     outDir: 'dist',
     emptyOutDir: true,

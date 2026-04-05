@@ -47,10 +47,23 @@ export interface Task {
   status: string
   domain: string | null
   project_id: string
+  project_name: string
   pr_number: number | null
   branch: string | null
   spec_path: string | null
   description: string | null
+  created_at: string
+  updated_at: string
+  completed_at: string | null
+  phase: string
+}
+
+export interface ProjectSummary {
+  project_id: string
+  project_name: string
+  open_count: number
+  in_progress_count: number
+  done_count: number
 }
 
 export type DetailTarget =
