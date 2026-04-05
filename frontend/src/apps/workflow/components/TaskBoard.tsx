@@ -65,7 +65,7 @@ function ProjectCard({ label, open, inProgress, done, active, onClick }: Project
   return (
     <button
       onClick={onClick}
-      className={`flex-shrink-0 flex flex-col gap-1 px-3 py-2 rounded-lg border transition-colors text-left ${
+      className={`flex flex-col gap-1 px-3 py-2 rounded-lg border transition-colors text-left ${
         active
           ? 'bg-gray-800 border-blue-500'
           : 'bg-gray-800 border-gray-700 hover:border-gray-600'
@@ -326,7 +326,7 @@ export default function TaskBoard() {
       </div>
 
       {/* Project summary cards */}
-      <div className="flex items-center gap-2 px-4 py-2 border-b border-gray-800 overflow-x-auto shrink-0">
+      <div className="flex flex-wrap gap-2 px-4 py-2 border-b border-gray-800 shrink-0">
         <ProjectCard
           label="All"
           open={allCounts.open}
