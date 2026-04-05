@@ -513,3 +513,209 @@ async def reject(approval_id: int):
     finally:
         db.close()
     return RedirectResponse(url="/scheduler/approvals", status_code=303)
+
+
+# ---------------------------------------------------------------------------
+# JSON API endpoints (for React SPA)
+# ---------------------------------------------------------------------------
+
+from fastapi.responses import JSONResponse
+
+
+def _task_to_dict(task, state=None):
+    """Serialize a Task object to JSON-safe dict."""
+    d = {
+        "name": task.name,
+        "slug": task.slug,
+        "schedule": task.schedule,
+        "enabled": task.enabled,
+        "model": getattr(task, "model", "claude-sonnet-4-6"),
+        "max_turns": getattr(task, "max_turns", 10),
+        "timeout": getattr(task, "timeout", 300),
+        "tools": getattr(task, "tools", []),
+        "workdir": getattr(task, "workdir", ""),
+        "file_path": str(task.file_path),
+        "prompt": getattr(task, "prompt", ""),
+    }
+    if state:
+        d["last_status"] = state.get("last_status")
+        d["last_run_at"] = state.get("last_run_at")
+        d["next_run_at"] = state.get("next_run_at")
+        d["run_count"] = state.get("run_count", 0)
+    return d
+
+
+def _run_to_dict(run):
+    """Serialize a RunRecord to JSON-safe dict."""
+    return {
+        "id": run.id,
+        "task_name": run.task_name,
+        "status": run.status,
+        "started_at": run.started_at,
+        "finished_at": run.finished_at,
+        "duration_seconds": run.duration_seconds,
+        "cost_usd": run.cost_usd,
+        "error": run.error,
+    }
+
+
+@router.get("/api/tasks", response_class=JSONResponse)
+async def api_tasks():
+    db = get_db()
+    try:
+        tasks = find_tasks(TASKS_DIR)
+        states = db.get_all_task_states()
+        states_map = {s["task_name"]: s for s in states}
+        return JSONResponse([_task_to_dict(t, states_map.get(t.name)) for t in tasks])
+    finally:
+        db.close()
+
+
+@router.get("/api/tasks/{slug}", response_class=JSONResponse)
+async def api_task_detail_json(slug: str):
+    task, err = _find_task_by_slug(slug)
+    if err:
+        return JSONResponse({"error": err}, status_code=404)
+    db = get_db()
+    try:
+        state = db.get_task_state(task.name)
+        runs = db.get_run_history(task_name=task.name, limit=20)
+        errs = db.get_errors(task_name=task.name, limit=10)
+        return JSONResponse({
+            "task": _task_to_dict(task, state),
+            "runs": [_run_to_dict(r) for r in runs],
+            "errors": [{"message": e.message, "timestamp": e.timestamp, "task_name": e.task_name} for e in errs],
+        })
+    finally:
+        db.close()
+
+
+@router.get("/api/stats", response_class=JSONResponse)
+async def api_stats():
+    db = get_db()
+    try:
+        tasks = find_tasks(TASKS_DIR)
+        runs = db.get_run_history(limit=100)
+        total_cost = sum(r.cost_usd for r in runs)
+        return JSONResponse({
+            "total_tasks": len(tasks),
+            "enabled": sum(1 for t in tasks if t.enabled),
+            "disabled": sum(1 for t in tasks if not t.enabled),
+            "total_runs": len(runs),
+            "successes": sum(1 for r in runs if r.status == "success"),
+            "failures": sum(1 for r in runs if r.status in ("failed", "timeout")),
+            "total_cost": total_cost,
+        })
+    finally:
+        db.close()
+
+
+@router.get("/api/history", response_class=JSONResponse)
+async def api_history(task: str = Query(default=None), n: int = Query(default=50)):
+    db = get_db()
+    try:
+        runs = db.get_run_history(task_name=task, limit=n)
+        return JSONResponse([_run_to_dict(r) for r in runs])
+    finally:
+        db.close()
+
+
+@router.get("/api/errors", response_class=JSONResponse)
+async def api_errors_json(task: str = Query(default=None)):
+    db = get_db()
+    try:
+        errs = db.get_errors(task_name=task)
+        return JSONResponse([
+            {"message": e.message, "timestamp": e.timestamp, "task_name": e.task_name}
+            for e in errs
+        ])
+    finally:
+        db.close()
+
+
+@router.get("/api/tickets", response_class=JSONResponse)
+async def api_tickets_json(status: str = Query(default=None)):
+    db = get_db()
+    try:
+        items = db.get_tickets(status=status)
+        return JSONResponse([dict(t) for t in items])
+    finally:
+        db.close()
+
+
+@router.get("/api/notifications", response_class=JSONResponse)
+async def api_notifications_json(all: str = Query(default=None)):
+    db = get_db()
+    try:
+        show_all = all == "true"
+        items = db.get_notifications(unread_only=not show_all)
+        return JSONResponse([dict(n) for n in items])
+    finally:
+        db.close()
+
+
+@router.get("/api/doctor", response_class=JSONResponse)
+async def api_doctor():
+    checks = []
+    try:
+        result = subprocess.run(
+            ["claude", "--version"], capture_output=True, text=True, timeout=5,
+        )
+        checks.append({
+            "name": "Claude CLI", "ok": result.returncode == 0,
+            "detail": result.stdout.strip() if result.returncode == 0 else result.stderr.strip(),
+        })
+    except Exception as e:
+        checks.append({"name": "Claude CLI", "ok": False, "detail": str(e)})
+
+    tasks = find_tasks(TASKS_DIR)
+    checks.append({"name": "Task files", "ok": len(tasks) > 0, "detail": f"{len(tasks)} task(s) found"})
+
+    db = get_db()
+    try:
+        stale = db.recover_stale_runs(max_age_seconds=3600)
+        checks.append({
+            "name": "Stale runs", "ok": len(stale) == 0,
+            "detail": f"{len(stale)} stale run(s) recovered" if stale else "No stale runs",
+        })
+        open_tickets = db.get_tickets(status="open")
+        checks.append({
+            "name": "Open tickets", "ok": len(open_tickets) == 0,
+            "detail": f"{len(open_tickets)} open ticket(s)" if open_tickets else "No open tickets",
+        })
+    finally:
+        db.close()
+
+    usage = shutil.disk_usage("/")
+    free_gb = usage.free / (1024 ** 3)
+    checks.append({"name": "Disk space", "ok": free_gb > 1.0, "detail": f"{free_gb:.1f} GB free"})
+    return JSONResponse(checks)
+
+
+@router.get("/api/logs/{slug}", response_class=JSONResponse)
+async def api_logs(slug: str):
+    task, err = _find_task_by_slug(slug)
+    if err:
+        return JSONResponse({"error": err}, status_code=404)
+    log_content = ""
+    log_file = None
+    if LOGS_DIR.exists():
+        candidates = sorted(LOGS_DIR.glob(f"{slug}*"), key=lambda p: p.stat().st_mtime, reverse=True)
+        if candidates:
+            log_file = candidates[0]
+            raw = log_file.read_text(errors="replace")
+            log_content = raw[-5000:] if len(raw) > 5000 else raw
+    return JSONResponse({"task_name": task.name, "log_file": str(log_file) if log_file else None, "content": log_content})
+
+
+@router.get("/api/approvals", response_class=JSONResponse)
+async def api_approvals_json():
+    db = get_db()
+    try:
+        pending = db.get_pending_approvals()
+        for item in pending:
+            artifact = db.get_artifact(item["artifact_id"])
+            item["artifact"] = dict(artifact) if artifact else None
+        return JSONResponse([dict(a) for a in pending])
+    finally:
+        db.close()

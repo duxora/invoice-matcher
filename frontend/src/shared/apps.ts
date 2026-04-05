@@ -22,7 +22,7 @@ export const HUB_APPS: HubApp[] = [
     icon: '📋',
     path: '/scheduler',
     description: 'Claude task scheduler dashboard',
-    migrated: false,
+    migrated: true,
   },
   {
     id: 'kb',
@@ -30,7 +30,7 @@ export const HUB_APPS: HubApp[] = [
     icon: '📚',
     path: '/kb',
     description: 'Local knowledge base with curated insights',
-    migrated: false,
+    migrated: true,
   },
   {
     id: 'telegram',
@@ -38,6 +38,6 @@ export const HUB_APPS: HubApp[] = [
     icon: '🤖',
     path: '/telegram-bridge',
     description: 'Two-way Telegram bot with plugin system',
-    migrated: false,
+    migrated: true,
   },
 ]

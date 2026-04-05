@@ -1,9 +1,10 @@
 import { createBrowserRouter, Navigate } from 'react-router-dom'
 import { lazy } from 'react'
 import HubShell from './layouts/HubShell'
-import PlaceholderApp from './shared/PlaceholderApp'
-
 const WorkflowApp = lazy(() => import('./apps/workflow/App'))
+const TelegramApp = lazy(() => import('./apps/telegram/App'))
+const KBApp = lazy(() => import('./apps/kb/App'))
+const SchedulerApp = lazy(() => import('./apps/scheduler/App'))
 
 export const router = createBrowserRouter([
   {
@@ -16,15 +17,15 @@ export const router = createBrowserRouter([
       },
       {
         path: 'scheduler/*',
-        element: <PlaceholderApp appName="Scheduler" jinjaPath="/scheduler" />,
+        element: <SchedulerApp />,
       },
       {
         path: 'kb/*',
-        element: <PlaceholderApp appName="Knowledge Base" jinjaPath="/kb" />,
+        element: <KBApp />,
       },
       {
         path: 'telegram-bridge/*',
-        element: <PlaceholderApp appName="Telegram Bridge" jinjaPath="/telegram-bridge" />,
+        element: <TelegramApp />,
       },
     ],
   },
