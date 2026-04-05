@@ -1,0 +1,42 @@
+{% extends "base.html" %}
+{% block title %}Errors - Scheduler{% endblock %}
+
+{% block content %}
+<div class="mb-6">
+  <h1 class="text-2xl font-bold">Errors</h1>
+  {% if filter_task %}
+  <p class="text-hub-muted text-sm mt-1">Filtered by task: <span class="text-hub-accent">{{ filter_task }}</span></p>
+  {% endif %}
+</div>
+
+<div class="bg-hub-card border border-hub-border rounded-lg overflow-hidden">
+  <table class="w-full text-sm">
+    <thead>
+      <tr class="border-b border-hub-border text-hub-muted text-left">
+        <th class="px-4 py-3">ID</th>
+        <th class="px-4 py-3">Task</th>
+        <th class="px-4 py-3">Type</th>
+        <th class="px-4 py-3">Message</th>
+        <th class="px-4 py-3">When</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for err in errors %}
+      <tr class="border-b border-hub-border hover:bg-hub-bg/50">
+        <td class="px-4 py-3 text-hub-muted">{{ err.id }}</td>
+        <td class="px-4 py-3">{{ err.task_name }}</td>
+        <td class="px-4 py-3">
+          <span class="px-2 py-0.5 rounded text-xs font-medium bg-red-900/40 text-red-400">{{ err.error_type }}</span>
+        </td>
+        <td class="px-4 py-3 text-hub-muted" title="{{ err.error_message }}">{{ err.error_message[:60] }}{% if err.error_message | length > 60 %}...{% endif %}</td>
+        <td class="px-4 py-3 text-hub-muted">{{ err.occurred_at }}</td>
+      </tr>
+      {% else %}
+      <tr>
+        <td colspan="5" class="px-4 py-8 text-center text-hub-muted">No errors recorded.</td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+{% endblock %}

@@ -1,0 +1,25 @@
+FROM python:3.12-slim
+
+WORKDIR /app
+
+COPY pyproject.toml .
+RUN pip install --no-cache-dir .
+
+COPY src/ src/
+
+COPY <<'ENTRY' /app/entrypoint.sh
+#!/bin/bash
+if [ -n "$GOOGLE_CREDENTIALS_JSON" ]; then
+  echo "$GOOGLE_CREDENTIALS_JSON" | base64 -d > /tmp/google-credentials.json
+  export GOOGLE_CREDENTIALS_PATH=/tmp/google-credentials.json
+fi
+exec gunicorn claude_scheduler.timetable.app:app \
+  --worker-class uvicorn.workers.UvicornWorker \
+  --bind 0.0.0.0:8080 \
+  --workers 1 \
+  --timeout 120
+ENTRY
+RUN chmod +x /app/entrypoint.sh
+
+EXPOSE 8080
+CMD ["/app/entrypoint.sh"]

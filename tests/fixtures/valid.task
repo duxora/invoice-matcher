@@ -1,0 +1,11 @@
+# name: Test Task
+# schedule: daily 09:00
+# workdir: ~/workspace/myproject
+# tools: Read,Grep
+# max_turns: 3
+# model: claude-sonnet-4-6
+# timeout: 120
+# enabled: true
+---
+This is a test prompt.
+It has multiple lines.

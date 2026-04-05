@@ -1,0 +1,148 @@
+{% extends "base.html" %}
+
+{% block title %}Knowledge Base{% endblock %}
+
+{% block content %}
+<!-- Header -->
+<div class="flex items-center justify-between mb-6">
+  <h1 class="text-2xl font-bold">📚 Knowledge Base</h1>
+  <div class="flex gap-2">
+    <button class="btn btn-primary" onclick="document.getElementById('ingest-modal').classList.toggle('hidden')">+ Ingest URL</button>
+    <a href="/kb/sources" class="btn btn-ghost">Sources</a>
+  </div>
+</div>
+
+<!-- Stats Row -->
+<div class="grid grid-cols-2 md:grid-cols-5 gap-4 mb-6">
+  <div class="bg-hub-card border border-hub-border rounded-lg p-4">
+    <div class="text-hub-muted text-xs uppercase tracking-wide mb-1">Total Entries</div>
+    <div class="text-2xl font-bold">{{ stats.total_entries }}</div>
+  </div>
+  {% for domain, count in stats.by_domain.items() | sort %}
+  <div class="bg-hub-card border border-hub-border rounded-lg p-4">
+    <div class="text-hub-muted text-xs uppercase tracking-wide mb-1">{{ domain }}</div>
+    <div class="text-2xl font-bold text-hub-accent">{{ count }}</div>
+  </div>
+  {% endfor %}
+</div>
+
+<!-- Search Bar -->
+<div class="bg-hub-card border border-hub-border rounded-lg p-4 mb-6">
+  <div class="flex gap-3">
+    <input type="text" id="search-input" placeholder="Search knowledge base..."
+           class="flex-1 bg-hub-bg border border-hub-border rounded px-3 py-2 text-sm text-hub-text focus:outline-none focus:border-hub-accent"
+           hx-get="/kb/partials/search-results"
+           hx-trigger="keyup changed delay:300ms"
+           hx-target="#search-results"
+           hx-include="#domain-filter"
+           name="q">
+    <select id="domain-filter" name="domain"
+            class="bg-hub-bg border border-hub-border rounded px-3 py-2 text-sm text-hub-text focus:outline-none focus:border-hub-accent">
+      <option value="">All Domains</option>
+      <option value="tech-trends">tech-trends</option>
+      <option value="coding-skills">coding-skills</option>
+      <option value="system-design">system-design</option>
+      <option value="leadership">leadership</option>
+      <option value="startup">startup</option>
+    </select>
+  </div>
+  <div id="search-results" class="mt-4"></div>
+</div>
+
+<!-- Two Column Layout -->
+<div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+  <!-- Trending -->
+  <div class="bg-hub-card border border-hub-border rounded-lg">
+    <div class="px-4 py-3 border-b border-hub-border">
+      <h2 class="text-lg font-semibold">🔥 Trending (Last 7 Days)</h2>
+    </div>
+    <div class="p-4"
+         hx-get="/kb/partials/trending"
+         hx-trigger="every 30s"
+         hx-swap="innerHTML">
+      {% if trending %}
+      {% for e in trending %}
+      <div class="mb-4 pb-4 {% if not loop.last %}border-b border-hub-border{% endif %}">
+        <a href="/kb/entry/{{ e.id }}" class="text-hub-accent hover:underline font-medium">{{ e.title }}</a>
+        <div class="flex items-center gap-2 mt-1">
+          <span class="badge badge-running">{{ e.domain.value }}</span>
+          <span class="badge badge-{{ 'success' if e.confidence.value == 'high' else 'timeout' if e.confidence.value == 'medium' else 'never' }}">{{ e.confidence.value }}</span>
+          {% for tag in e.tags[:3] %}
+          <span class="text-xs text-hub-muted">#{{ tag }}</span>
+          {% endfor %}
+        </div>
+        <p class="text-sm text-hub-muted mt-1">{{ e.summary[:150] }}{% if e.summary|length > 150 %}...{% endif %}</p>
+      </div>
+      {% endfor %}
+      {% else %}
+      <p class="text-hub-muted text-sm">No entries from the last 7 days.</p>
+      {% endif %}
+    </div>
+  </div>
+
+  <!-- Domain Browser -->
+  <div class="bg-hub-card border border-hub-border rounded-lg">
+    <div class="px-4 py-3 border-b border-hub-border flex items-center justify-between">
+      <h2 class="text-lg font-semibold">📂 Browse by Domain</h2>
+    </div>
+    <div class="p-4">
+      <div class="flex flex-wrap gap-2 mb-4">
+        {% set domains = ['tech-trends', 'coding-skills', 'system-design', 'leadership', 'startup'] %}
+        {% for d in domains %}
+        <button class="btn btn-ghost text-xs domain-btn"
+                hx-get="/kb/partials/browse?domain={{ d }}"
+                hx-target="#browse-results"
+                onclick="document.querySelectorAll('.domain-btn').forEach(b=>b.classList.remove('text-hub-accent'));this.classList.add('text-hub-accent')">
+          {{ d }} {% if stats.by_domain.get(d) %}({{ stats.by_domain[d] }}){% endif %}
+        </button>
+        {% endfor %}
+      </div>
+      <div id="browse-results">
+        <p class="text-hub-muted text-sm">Select a domain above to browse entries.</p>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Recent Entries Table -->
+<div class="bg-hub-card border border-hub-border rounded-lg mt-6">
+  <div class="px-4 py-3 border-b border-hub-border">
+    <h2 class="text-lg font-semibold">📋 Recent Entries</h2>
+  </div>
+  <div class="p-4"
+       hx-get="/kb/partials/recent"
+       hx-trigger="every 30s"
+       hx-swap="innerHTML">
+    {% include "partials/entries_table.html" %}
+  </div>
+</div>
+
+<!-- Ingest Modal -->
+<div id="ingest-modal" class="hidden fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50">
+  <div class="bg-hub-card border border-hub-border rounded-lg p-6 w-full max-w-lg">
+    <h3 class="text-lg font-semibold mb-4">Ingest URL</h3>
+    <form hx-post="/kb/ingest" hx-target="#ingest-result" hx-swap="innerHTML">
+      <div class="mb-3">
+        <label class="block text-sm font-medium text-hub-muted mb-1">URL</label>
+        <input type="text" name="url" placeholder="https://..." required
+               class="w-full bg-hub-bg border border-hub-border rounded px-3 py-2 text-sm text-hub-text focus:outline-none focus:border-hub-accent">
+      </div>
+      <div class="mb-4">
+        <label class="block text-sm font-medium text-hub-muted mb-1">Domain</label>
+        <select name="domain" class="w-full bg-hub-bg border border-hub-border rounded px-3 py-2 text-sm text-hub-text">
+          <option value="tech-trends">tech-trends</option>
+          <option value="coding-skills">coding-skills</option>
+          <option value="system-design">system-design</option>
+          <option value="leadership">leadership</option>
+          <option value="startup">startup</option>
+        </select>
+      </div>
+      <div id="ingest-result" class="mb-3 text-sm"></div>
+      <div class="flex gap-2 justify-end">
+        <button type="button" class="btn btn-ghost" onclick="document.getElementById('ingest-modal').classList.add('hidden')">Cancel</button>
+        <button type="submit" class="btn btn-primary">Ingest</button>
+      </div>
+    </form>
+  </div>
+</div>
+{% endblock %}

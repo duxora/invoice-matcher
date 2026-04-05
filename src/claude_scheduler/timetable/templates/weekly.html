@@ -1,0 +1,117 @@
+{% extends "base.html" %}
+{% block title %}{{ t("family_timetable") }} - {{ t("week_view") }}{% endblock %}
+
+{% block content %}
+<div class="mb-6 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
+  <div>
+    <h1 class="text-2xl font-bold">{{ t("family_timetable") }}</h1>
+    <p class="text-hub-muted text-sm">{{ week_label }}</p>
+  </div>
+  <div class="flex flex-wrap items-center gap-2">
+    <a href="/?week={{ prev_week }}{% if selected_member %}&member={{ selected_member }}{% endif %}" class="btn btn-ghost text-sm">&larr; {{ t("prev") }}</a>
+    <a href="/{% if selected_member %}?member={{ selected_member }}{% endif %}" class="btn btn-ghost text-sm">{{ t("today") }}</a>
+    <a href="/?week={{ next_week }}{% if selected_member %}&member={{ selected_member }}{% endif %}" class="btn btn-ghost text-sm">{{ t("next") }} &rarr;</a>
+    <a href="/month" class="btn btn-ghost text-sm">{{ t("month_view") }}</a>
+    <a href="/add" class="btn btn-primary text-sm">+ {{ t("add") }}</a>
+  </div>
+</div>
+
+{# Member filter #}
+<div class="flex flex-wrap gap-2 mb-4">
+  <a href="/?week={{ days[0].date }}"
+     class="px-3 py-1 rounded-full text-xs border transition-colors
+            {% if not selected_member %}bg-hub-accent/20 border-hub-accent text-hub-accent{% else %}border-hub-border text-hub-muted hover:text-hub-text{% endif %}">
+    {{ t("filter_all") }}
+  </a>
+  {% for member in family_members %}
+  {% set color = get_member_color(member) %}
+  <a href="/?week={{ days[0].date }}&member={{ member }}"
+     class="px-3 py-1 rounded-full text-xs border transition-colors
+            {% if selected_member == member %}{{ color.bg }} {{ color.border }} {{ color.text }}{% else %}border-hub-border text-hub-muted hover:text-hub-text{% endif %}">
+    {{ member }}
+  </a>
+  {% endfor %}
+</div>
+
+{# Overdue warning #}
+{% if overdue %}
+<div class="bg-red-500/10 border border-red-500/30 rounded-lg p-3 mb-4">
+  <span class="text-red-400 text-sm font-medium">{{ overdue|length }} {{ t("overdue") }}</span>
+  <span class="text-hub-muted text-xs ml-2">
+    {% for r in overdue[:3] %}{{ r.Title or r.Subject }}{% if not loop.last %}, {% endif %}{% endfor %}
+    {% if overdue|length > 3 %}...{% endif %}
+  </span>
+</div>
+{% endif %}
+
+{# Pending reminders #}
+{% if reminders %}
+<div class="bg-yellow-500/10 border border-yellow-500/30 rounded-lg p-3 mb-4">
+  <span class="text-yellow-400 text-sm font-medium">{{ reminders|length }} {{ t("pending_reminders") }}</span>
+  <span class="text-hub-muted text-xs ml-2">
+    {% for r in reminders[:3] %}{{ r.Title }}{% if not loop.last %}, {% endif %}{% endfor %}
+    {% if reminders|length > 3 %}...{% endif %}
+  </span>
+</div>
+{% endif %}
+
+{# Conflict warning #}
+{% if conflicts %}
+<div class="bg-orange-500/10 border border-orange-500/30 rounded-lg p-3 mb-4">
+  <span class="text-orange-400 text-sm font-medium">{{ t("conflict_warning") }}</span>
+  <span class="text-hub-muted text-xs ml-2">
+    {% for c1, c2 in conflicts[:2] %}
+    {{ c1.Person }}: {{ c1.Title or c1.Subject }} &amp; {{ c2.Title or c2.Subject }}{% if not loop.last %}; {% endif %}
+    {% endfor %}
+  </span>
+</div>
+{% endif %}
+
+{# Calendar grid - responsive: stack on mobile, 7-col on desktop #}
+<div class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 lg:grid-cols-7 gap-2">
+  {% for day in days %}
+  <div class="bg-hub-card border rounded-lg p-3 min-h-[140px] lg:min-h-[200px]
+              {% if day.is_today %}border-hub-accent ring-1 ring-hub-accent/30{% else %}border-hub-border{% endif %}">
+    <a href="/day/{{ day.date }}{% if selected_member %}?member={{ selected_member }}{% endif %}"
+       class="block text-sm font-medium mb-2 hover:text-hub-accent transition-colors
+              {% if day.is_today %}text-hub-accent{% endif %}">
+      {{ day.label }}
+      {% if day.is_today %}<span class="ml-1 text-[10px] bg-hub-accent/20 px-1.5 py-0.5 rounded-full">{{ t("today") }}</span>{% endif %}
+    </a>
+    <div class="space-y-1">
+      {% for entry in day.entries[:6] %}
+      {% set color = get_member_color(entry.get("Person", entry.get("Participants", "Family"))) %}
+      <div class="{{ color.bg }} {{ color.border }} border-l-2 rounded-r px-2 py-1
+                  {% if entry.get('Status') == 'done' or entry.get('Done') %}opacity-50 line-through{% endif %}">
+        <div class="text-xs {{ color.text }}">{{ entry.get("Time", entry.get("Start Time", "")) }}</div>
+        <div class="text-xs truncate">{{ entry.get("Title", entry.get("Subject", "")) }}</div>
+        <div class="text-[10px] text-hub-muted">{{ entry.get("Person", entry.get("Participants", "")) }}</div>
+      </div>
+      {% endfor %}
+      {% if day.entries|length > 6 %}
+      <a href="/day/{{ day.date }}" class="text-[10px] text-hub-accent">+{{ day.entries|length - 6 }} {{ t("more") }}</a>
+      {% endif %}
+    </div>
+  </div>
+  {% endfor %}
+</div>
+
+{# Legend #}
+<div class="mt-4 flex flex-wrap gap-3 text-xs text-hub-muted">
+  {% for member in family_members %}
+  {% set color = get_member_color(member) %}
+  <span class="flex items-center gap-1">
+    <span class="w-3 h-3 rounded {{ color.bg }} {{ color.border }} border"></span>
+    {{ member }}
+  </span>
+  {% endfor %}
+</div>
+
+{# Quick links #}
+<div class="mt-6 flex flex-wrap gap-3 text-sm">
+  <a href="/templates" class="text-hub-muted hover:text-hub-accent transition-colors">{{ t("templates") }}</a>
+  <a href="/activity" class="text-hub-muted hover:text-hub-accent transition-colors">{{ t("activity_log") }}</a>
+  <a href="/export.ics{% if selected_member %}?member={{ selected_member }}{% endif %}" class="text-hub-muted hover:text-hub-accent transition-colors">{{ t("export_ical") }}</a>
+  <a href="/colors" class="text-hub-muted hover:text-hub-accent transition-colors">{{ t("color_settings") }}</a>
+</div>
+{% endblock %}

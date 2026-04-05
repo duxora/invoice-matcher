@@ -1,0 +1,26 @@
+{% if entries %}
+<table class="data-table">
+  <thead>
+    <tr>
+      <th>Title</th>
+      <th>Domain</th>
+      <th>Confidence</th>
+      <th>Tags</th>
+      <th>Created</th>
+    </tr>
+  </thead>
+  <tbody>
+    {% for e in entries %}
+    <tr>
+      <td><a href="/kb/entry/{{ e.id }}" class="text-hub-accent hover:underline">{{ e.title }}</a></td>
+      <td><span class="badge badge-running">{{ e.domain.value }}</span></td>
+      <td><span class="badge badge-{{ 'success' if e.confidence.value == 'high' else 'timeout' if e.confidence.value == 'medium' else 'never' }}">{{ e.confidence.value }}</span></td>
+      <td class="text-hub-muted text-xs">{{ e.tags[:3] | join(', ') }}</td>
+      <td class="text-hub-muted text-xs">{{ e.created.strftime('%Y-%m-%d %H:%M') }}</td>
+    </tr>
+    {% endfor %}
+  </tbody>
+</table>
+{% else %}
+<p class="text-hub-muted text-sm">No entries yet. Ingest a URL or run <code>kb ingest-all</code> to get started.</p>
+{% endif %}

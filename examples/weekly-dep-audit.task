@@ -1,0 +1,25 @@
+# name: Weekly Dependency Audit
+# schedule: weekly mon 08:00
+# workdir: ~/workspace/myproject
+# model: claude-sonnet-4-6
+# tools: Read,Grep,Glob,Bash
+# max_turns: 10
+# timeout: 300
+# retry: 1
+# notify: all
+# on_failure: notify
+# enabled: false
+---
+Audit project dependencies for security and freshness.
+
+Steps:
+1. Find package files (package.json, requirements.txt, go.mod, pyproject.toml)
+2. For each: check if there are known outdated or deprecated packages
+3. Look for pinned versions that might have security patches available
+4. Check for unused dependencies (imported but not used in code)
+
+Output a markdown report with:
+- Dependencies checked
+- Outdated packages with current vs latest version
+- Security concerns
+- Unused dependencies to consider removing

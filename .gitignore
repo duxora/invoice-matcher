@@ -1,4 +1,12 @@
-.env
 __pycache__/
 *.pyc
-tests/output/
+*.pyo
+.pytest_cache/
+data/
+logs/
+*.egg-info/
+dist/
+build/
+.eggs/
+credentials.json
+.env

@@ -1,0 +1,22 @@
+{% extends "base.html" %}
+{% block title %}Health Check - Scheduler{% endblock %}
+
+{% block content %}
+<div class="mb-6">
+  <h1 class="text-2xl font-bold">Health Check</h1>
+</div>
+
+<div class="bg-hub-card border border-hub-border rounded-lg divide-y divide-hub-border">
+  {% for check in checks %}
+  <div class="flex items-center gap-3 px-4 py-3">
+    <span class="text-lg">{% if check.ok %}&#9989;{% else %}&#10060;{% endif %}</span>
+    <div>
+      <p class="font-medium text-sm">{{ check.name }}</p>
+      <p class="text-xs text-hub-muted">{{ check.detail }}</p>
+    </div>
+  </div>
+  {% else %}
+  <div class="px-4 py-8 text-center text-hub-muted">No checks ran.</div>
+  {% endfor %}
+</div>
+{% endblock %}

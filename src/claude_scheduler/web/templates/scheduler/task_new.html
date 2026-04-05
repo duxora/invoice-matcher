@@ -1,0 +1,206 @@
+{% extends "base.html" %}
+{% block title %}Create New Task - Scheduler{% endblock %}
+
+{% block content %}
+<div class="mb-2">
+  <a href="/scheduler/" class="text-hub-accent text-sm hover:underline">&larr; Back to Dashboard</a>
+</div>
+
+<div class="mb-6">
+  <h1 class="text-2xl font-bold">Create New Task</h1>
+</div>
+
+<!-- AI Prompt Generator — Primary Flow -->
+<div class="bg-hub-card border-2 border-hub-accent/30 rounded-lg p-6 max-w-2xl mb-6">
+  <div class="flex items-center gap-2 mb-4">
+    <span class="text-lg">✨</span>
+    <h2 class="text-lg font-semibold">Describe what you want</h2>
+  </div>
+  <p class="text-sm text-hub-muted mb-4">Tell us what this task should do in plain language. AI will generate a detailed, structured prompt for you.</p>
+
+  <div class="space-y-3">
+    <div>
+      <input type="text" id="ai-name" placeholder="Task name (e.g. Daily Code Review)"
+             class="w-full px-3 py-2 text-sm bg-hub-bg border border-hub-border rounded focus:outline-none focus:border-hub-accent">
+    </div>
+    <div>
+      <textarea id="ai-description" rows="3"
+                class="w-full px-3 py-2 text-sm bg-hub-bg border border-hub-border rounded focus:outline-none focus:border-hub-accent"
+                placeholder="e.g. Review all commits from the last 24 hours, check for security issues, code quality problems, and missing tests. Summarize findings in a markdown report."></textarea>
+    </div>
+    <div class="grid grid-cols-2 gap-3">
+      <input type="text" id="ai-workdir" placeholder="Working directory (optional)"
+             class="px-3 py-2 text-sm bg-hub-bg border border-hub-border rounded focus:outline-none focus:border-hub-accent">
+      <input type="text" id="ai-schedule" placeholder="Schedule (e.g. daily 09:00)"
+             class="px-3 py-2 text-sm bg-hub-bg border border-hub-border rounded focus:outline-none focus:border-hub-accent">
+    </div>
+    <button type="button" id="generate-btn"
+            onclick="generatePrompt()"
+            class="btn btn-primary w-full py-2.5 flex items-center justify-center gap-2">
+      <span id="generate-text">✨ Generate Task with AI</span>
+      <span id="generate-spinner" class="hidden">Generating...</span>
+    </button>
+  </div>
+</div>
+
+<!-- Divider -->
+<div class="max-w-2xl flex items-center gap-4 mb-6">
+  <div class="flex-1 border-t border-hub-border"></div>
+  <span class="text-xs text-hub-muted uppercase">or configure manually</span>
+  <div class="flex-1 border-t border-hub-border"></div>
+</div>
+
+<!-- Full Form -->
+<div class="bg-hub-card border border-hub-border rounded-lg p-6 max-w-2xl">
+  {% if errors %}
+  <div class="bg-red-900/30 border border-red-500/50 rounded-lg p-4 mb-4">
+    <ul class="text-red-400 text-sm space-y-1">
+      {% for err in errors %}
+      <li>{{ err }}</li>
+      {% endfor %}
+    </ul>
+  </div>
+  {% endif %}
+  <form method="post" action="/scheduler/tasks-new" class="space-y-4" id="task-form">
+    <div class="grid grid-cols-2 gap-4">
+      <div>
+        <label for="name" class="block text-sm font-medium mb-1">Name *</label>
+        <input type="text" id="name" name="name" required
+               class="w-full px-3 py-2 text-sm bg-hub-bg border border-hub-border rounded focus:outline-none focus:border-hub-accent">
+      </div>
+      <div>
+        <label for="schedule" class="block text-sm font-medium mb-1">Schedule *</label>
+        <input type="text" id="schedule" name="schedule" required placeholder="daily 09:00"
+               class="w-full px-3 py-2 text-sm bg-hub-bg border border-hub-border rounded focus:outline-none focus:border-hub-accent">
+      </div>
+    </div>
+
+    <div>
+      <label for="workdir" class="block text-sm font-medium mb-1">Working Directory</label>
+      <input type="text" id="workdir" name="workdir" placeholder="~/workspace"
+             class="w-full px-3 py-2 text-sm bg-hub-bg border border-hub-border rounded focus:outline-none focus:border-hub-accent">
+    </div>
+
+    <div class="grid grid-cols-3 gap-4">
+      <div>
+        <label for="model" class="block text-sm font-medium mb-1">Model</label>
+        <select id="model" name="model"
+                class="w-full px-3 py-2 text-sm bg-hub-bg border border-hub-border rounded focus:outline-none focus:border-hub-accent">
+          <option value="claude-sonnet-4-6" selected>Sonnet 4.6</option>
+          <option value="claude-opus-4-6">Opus 4.6</option>
+          <option value="claude-haiku-4-5-20251001">Haiku 4.5</option>
+        </select>
+      </div>
+      <div>
+        <label for="max_turns" class="block text-sm font-medium mb-1">Max Turns</label>
+        <input type="number" id="max_turns" name="max_turns" value="10" min="1"
+               class="w-full px-3 py-2 text-sm bg-hub-bg border border-hub-border rounded focus:outline-none focus:border-hub-accent">
+      </div>
+      <div>
+        <label for="timeout" class="block text-sm font-medium mb-1">Timeout (s)</label>
+        <input type="number" id="timeout" name="timeout" value="300" min="10"
+               class="w-full px-3 py-2 text-sm bg-hub-bg border border-hub-border rounded focus:outline-none focus:border-hub-accent">
+      </div>
+    </div>
+
+    <div class="grid grid-cols-2 gap-4">
+      <div>
+        <label for="tools" class="block text-sm font-medium mb-1">Tools</label>
+        <input type="text" id="tools" name="tools" value="Read,Grep,Glob"
+               class="w-full px-3 py-2 text-sm bg-hub-bg border border-hub-border rounded focus:outline-none focus:border-hub-accent">
+      </div>
+      <div>
+        <label for="retry" class="block text-sm font-medium mb-1">Retry</label>
+        <input type="number" id="retry" name="retry" value="1" min="0"
+               class="w-full px-3 py-2 text-sm bg-hub-bg border border-hub-border rounded focus:outline-none focus:border-hub-accent">
+      </div>
+    </div>
+
+    <!-- Prompt (AI-generated or manual) -->
+    <div>
+      <div class="flex items-center justify-between mb-1">
+        <label for="prompt" class="text-sm font-medium">Prompt *</label>
+        <button type="button" onclick="improvePrompt()"
+                class="text-xs text-hub-accent hover:underline" id="improve-btn">
+          ✨ Improve with AI
+        </button>
+      </div>
+      <div id="prompt-container">
+        <textarea name="prompt" id="prompt" rows="12" required
+                  class="w-full bg-hub-bg border border-hub-border rounded px-3 py-2 text-sm font-mono focus:border-hub-accent focus:outline-none text-hub-text"
+                  placeholder="Describe what Claude should do..."></textarea>
+      </div>
+    </div>
+
+    <div class="flex items-center gap-3 pt-2">
+      <button type="submit" class="btn btn-primary px-6 py-2">Create Task</button>
+      <a href="/scheduler/" class="btn btn-ghost">Cancel</a>
+    </div>
+  </form>
+</div>
+
+<script>
+async function generatePrompt() {
+    const btn = document.getElementById('generate-btn');
+    const text = document.getElementById('generate-text');
+    const spinner = document.getElementById('generate-spinner');
+    const desc = document.getElementById('ai-description').value.trim();
+    const name = document.getElementById('ai-name').value.trim();
+    const workdir = document.getElementById('ai-workdir').value.trim();
+    const schedule = document.getElementById('ai-schedule').value.trim();
+
+    if (!desc) { alert('Please describe what the task should do.'); return; }
+
+    btn.disabled = true;
+    text.classList.add('hidden');
+    spinner.classList.remove('hidden');
+
+    try {
+        const formData = new FormData();
+        formData.append('description', desc);
+        if (workdir) formData.append('workdir', workdir);
+
+        const resp = await fetch('/scheduler/api/generate-prompt', {
+            method: 'POST', body: formData
+        });
+        const html = await resp.text();
+
+        // Fill the form fields
+        if (name) document.getElementById('name').value = name;
+        if (schedule) document.getElementById('schedule').value = schedule;
+        if (workdir) document.getElementById('workdir').value = workdir;
+
+        // Swap prompt textarea
+        document.getElementById('prompt-container').innerHTML = html;
+    } finally {
+        btn.disabled = false;
+        text.classList.remove('hidden');
+        spinner.classList.add('hidden');
+    }
+}
+
+async function improvePrompt() {
+    const promptEl = document.querySelector('[name="prompt"]');
+    const prompt = promptEl.value.trim();
+    if (!prompt) { alert('No prompt to improve.'); return; }
+
+    const btn = document.getElementById('improve-btn');
+    btn.textContent = 'Improving...';
+    btn.disabled = true;
+
+    try {
+        const formData = new FormData();
+        formData.append('prompt', prompt);
+
+        const resp = await fetch('/scheduler/api/improve-prompt', {
+            method: 'POST', body: formData
+        });
+        const html = await resp.text();
+        document.getElementById('prompt-container').innerHTML = html;
+    } finally {
+        btn.textContent = '✨ Improve with AI';
+        btn.disabled = false;
+    }
+}
+</script>
+{% endblock %}

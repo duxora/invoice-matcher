@@ -1,0 +1,988 @@
+{% extends "base.html" %}
+{% block title %}Dev Workflow — Tools Hub{% endblock %}
+
+{% block content %}
+<div class="space-y-6">
+  <!-- Header -->
+  <div class="flex items-center justify-between">
+    <div>
+      <h1 class="text-xl font-bold text-hub-text">Dev Workflow</h1>
+      <p class="text-sm text-hub-muted">Pipeline: Intake → Backlog → Implement → PR → Deploy → Verify → Close</p>
+    </div>
+    <div class="flex items-center gap-2">
+      <button onclick="openDomainMapModal()" class="px-3 py-1.5 text-xs font-medium bg-hub-card border border-hub-border rounded-lg text-hub-muted hover:text-hub-text cursor-pointer" title="Domain Mapping Settings">
+        ⚙
+      </button>
+      <a href="https://platform.dev.spartan-dev.io" target="_blank"
+         class="px-3 py-1.5 text-xs font-medium bg-hub-card border border-hub-border rounded-lg text-hub-muted hover:text-hub-text">
+        Dev Site ↗
+      </a>
+      <a href="https://github.com/c0x12c-internal/service-insight" target="_blank"
+         class="px-3 py-1.5 text-xs font-medium bg-hub-card border border-hub-border rounded-lg text-hub-muted hover:text-hub-text">
+        GitHub ↗
+      </a>
+    </div>
+  </div>
+
+  {% if error %}
+  <div class="bg-red-900/30 border border-red-800 rounded-lg p-4 text-sm text-red-300">
+    {{ error }}
+  </div>
+  {% endif %}
+
+  <!-- Project summary cards (compact inline) -->
+  <div class="flex flex-wrap gap-2">
+    <a href="/workflow/"
+       class="flex items-center gap-3 px-3 py-1.5 rounded-lg border text-xs cursor-pointer
+              {% if not selected_project %}bg-hub-accent/10 border-hub-accent text-hub-accent{% else %}bg-hub-card border-hub-border text-hub-muted hover:border-hub-accent hover:text-hub-text{% endif %}">
+      <span class="font-medium">All</span>
+      {% if all_summary %}
+      <span class="flex items-center gap-1.5">
+        <span class="text-blue-400 font-semibold">{{ all_summary.open_count or 0 }}</span>
+        <span class="text-hub-border">/</span>
+        <span class="text-amber-400 font-semibold">{{ all_summary.in_progress_count or 0 }}</span>
+        <span class="text-hub-border">/</span>
+        <span class="text-green-400 font-semibold">{{ all_summary.done_count or 0 }}</span>
+      </span>
+      {% endif %}
+    </a>
+    {% for p in projects %}
+    <a href="/workflow/?project={{ p.project_id }}"
+       class="flex items-center gap-3 px-3 py-1.5 rounded-lg border text-xs cursor-pointer
+              {% if selected_project == p.project_id %}bg-hub-accent/10 border-hub-accent text-hub-accent{% else %}bg-hub-card border-hub-border text-hub-muted hover:border-hub-accent hover:text-hub-text{% endif %}">
+      <span class="font-medium">{{ p.project_name }}</span>
+      <span class="flex items-center gap-1.5">
+        <span class="text-blue-400 font-semibold">{{ p.open_count or 0 }}</span>
+        <span class="text-hub-border">/</span>
+        <span class="text-amber-400 font-semibold">{{ p.in_progress_count or 0 }}</span>
+        <span class="text-hub-border">/</span>
+        <span class="text-green-400 font-semibold">{{ p.done_count or 0 }}</span>
+      </span>
+    </a>
+    {% endfor %}
+  </div>
+
+  <!-- Workflow pipeline -->
+  <div class="flex flex-wrap items-center gap-1.5" id="pipeline">
+    {% set phase_config = {
+      "intake":    {"label": "Intake",    "color": "border-blue-700 text-blue-300"},
+      "backlog":   {"label": "Backlog",   "color": "border-indigo-700 text-indigo-300"},
+      "implement": {"label": "Implement", "color": "border-green-700 text-green-300"},
+      "pr_ci":     {"label": "PR & CI",   "color": "border-amber-700 text-amber-300"},
+      "review":    {"label": "Review",    "color": "border-orange-700 text-orange-300"},
+      "deploy":    {"label": "Deploy",    "color": "border-purple-700 text-purple-300"},
+      "verify":    {"label": "Verify",    "color": "border-teal-700 text-teal-300"},
+      "close":     {"label": "Close",     "color": "border-gray-600 text-gray-400"}
+    } %}
+    {% for key, cfg in phase_config.items() %}
+      {% set count = phases.get(key, 0) if phases else 0 %}
+      <button
+        onclick="filterPhase('{{ key }}')"
+        class="flex items-center gap-1.5 px-2.5 py-1 rounded-lg border text-xs font-medium cursor-pointer hover:brightness-125 bg-hub-card {{ cfg.color }}"
+        data-phase="{{ key }}"
+      >
+        {{ cfg.label }}
+        {% if count > 0 %}
+        <span class="bg-hub-accent text-hub-bg text-[10px] font-bold rounded-full min-w-[18px] h-[18px] flex items-center justify-center px-1">
+          {{ count }}
+        </span>
+        {% endif %}
+      </button>
+      {% if not loop.last %}
+      <span class="text-hub-border text-xs">→</span>
+      {% endif %}
+    {% endfor %}
+  </div>
+
+  <!-- Misplaced tasks banner -->
+  <div id="misplaced-banner" class="hidden bg-amber-900/20 border border-amber-700/50 rounded-xl p-4">
+    <div class="flex items-center justify-between mb-2">
+      <div class="flex items-center gap-2">
+        <span class="text-amber-400 text-sm">⚠</span>
+        <span class="text-sm font-medium text-amber-300" id="misplaced-count"></span>
+      </div>
+      <button onclick="toggleMisplacedList()" class="text-xs text-amber-400 hover:text-amber-300 cursor-pointer" id="misplaced-toggle">Show</button>
+    </div>
+    <div id="misplaced-list" class="hidden space-y-1.5 mt-2"></div>
+  </div>
+
+  <!-- Filters -->
+  <div class="flex items-center gap-2">
+    <div class="relative">
+      <input
+        id="filter-search"
+        type="text"
+        placeholder="Search ID or title…"
+        value="{{ search_query }}"
+        oninput="scheduleSearch()"
+        onkeydown="if(event.key==='Enter') applyFilters()"
+        class="pl-7 pr-3 py-1.5 text-xs bg-hub-card border border-hub-border rounded-lg text-hub-text placeholder-hub-muted focus:outline-none focus:border-hub-accent w-44"
+      />
+      <svg class="absolute left-2 top-1/2 -translate-y-1/2 w-3 h-3 text-hub-muted pointer-events-none" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/></svg>
+    </div>
+    <select id="filter-project"
+      onchange="applyFilters()"
+      class="px-3 py-1.5 text-xs font-medium bg-hub-card border border-hub-border rounded-lg text-hub-muted appearance-none cursor-pointer pr-7"
+      style="background-image: url('data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 width=%2212%22 height=%2212%22 viewBox=%220 0 24 24%22 fill=%22none%22 stroke=%22%2394a3b8%22 stroke-width=%222%22><path d=%22m6 9 6 6 6-6%22/></svg>'); background-repeat: no-repeat; background-position: right 8px center;"
+    >
+      <option value="" {% if not selected_project %}selected{% endif %}>All Projects</option>
+      {% for p in project_list %}
+      <option value="{{ p.id }}" {% if selected_project == p.id %}selected{% endif %}>{{ p.name }}</option>
+      {% endfor %}
+    </select>
+    <select id="filter-status"
+      onchange="applyFilters()"
+      class="px-3 py-1.5 text-xs font-medium bg-hub-card border border-hub-border rounded-lg text-hub-muted appearance-none cursor-pointer pr-7"
+      style="background-image: url('data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 width=%2212%22 height=%2212%22 viewBox=%220 0 24 24%22 fill=%22none%22 stroke=%22%2394a3b8%22 stroke-width=%222%22><path d=%22m6 9 6 6 6-6%22/></svg>'); background-repeat: no-repeat; background-position: right 8px center;"
+    >
+      <option value="" {% if not selected_status %}selected{% endif %}>Active (no done)</option>
+      <option value="open" {% if selected_status == 'open' %}selected{% endif %}>Open only</option>
+      <option value="in_progress" {% if selected_status == 'in_progress' %}selected{% endif %}>In Progress only</option>
+      <option value="done" {% if selected_status == 'done' %}selected{% endif %}>Done only</option>
+      <option value="all" {% if selected_status == 'all' %}selected{% endif %}>All statuses</option>
+    </select>
+  </div>
+
+  <!-- Task list -->
+  <div class="bg-hub-card border border-hub-border rounded-xl overflow-hidden">
+    <div class="flex items-center justify-between px-5 py-3 border-b border-hub-border">
+      <div class="flex items-center gap-3">
+        <input type="checkbox" id="select-all" onchange="toggleSelectAll(this.checked)"
+          class="w-3.5 h-3.5 rounded border-hub-border accent-hub-accent cursor-pointer" title="Select all" />
+        <h2 class="text-sm font-semibold text-hub-muted uppercase tracking-wider" id="task-list-title">
+          All Tasks
+        </h2>
+      </div>
+      <button onclick="filterPhase(null)" class="text-xs text-hub-muted hover:text-hub-accent cursor-pointer">
+        Show all
+      </button>
+    </div>
+    <!-- Bulk action bar -->
+    <div id="bulk-bar" class="hidden px-5 py-2.5 border-b border-hub-border bg-hub-accent/5 flex items-center gap-3">
+      <span class="text-xs text-hub-accent font-medium" id="bulk-count">0 selected</span>
+      <div class="relative">
+        <button onclick="toggleBulkMenu()" id="bulk-actions-btn"
+          class="px-3 py-1 text-xs font-medium bg-hub-accent text-hub-bg rounded hover:brightness-110 cursor-pointer flex items-center gap-1">
+          Actions ▾
+        </button>
+        <!-- Context menu -->
+        <div id="bulk-menu" class="hidden absolute left-0 top-full mt-1 w-56 bg-hub-sidebar border border-hub-border rounded-lg shadow-xl z-50 py-1">
+          <!-- Move to project -->
+          <div class="group relative">
+            <button onmouseenter="showSubmenu('move-sub')" onclick="showSubmenu('move-sub')"
+              class="w-full px-3 py-2 text-xs text-hub-text hover:bg-hub-accent/10 flex items-center justify-between cursor-pointer">
+              <span>Move to project</span><span class="text-hub-muted">▸</span>
+            </button>
+            <div id="move-sub" class="hidden absolute left-full top-0 w-48 bg-hub-sidebar border border-hub-border rounded-lg shadow-xl py-1 -mt-0.5 ml-0.5">
+              {% for p in project_list %}
+              <button onclick="bulkMove('{{ p.id }}')"
+                class="w-full px-3 py-1.5 text-xs text-hub-text hover:bg-hub-accent/10 text-left cursor-pointer">{{ p.name }}</button>
+              {% endfor %}
+            </div>
+          </div>
+          <div class="border-t border-hub-border/50 my-1"></div>
+          <!-- Set status -->
+          <div class="group relative">
+            <button onmouseenter="showSubmenu('status-sub')" onclick="showSubmenu('status-sub')"
+              class="w-full px-3 py-2 text-xs text-hub-text hover:bg-hub-accent/10 flex items-center justify-between cursor-pointer">
+              <span>Set status</span><span class="text-hub-muted">▸</span>
+            </button>
+            <div id="status-sub" class="hidden absolute left-full top-0 w-40 bg-hub-sidebar border border-hub-border rounded-lg shadow-xl py-1 -mt-0.5 ml-0.5">
+              <button onclick="bulkUpdate({status:'open'})"
+                class="w-full px-3 py-1.5 text-xs hover:bg-hub-accent/10 text-left cursor-pointer flex items-center gap-2">
+                <span class="w-1.5 h-1.5 rounded-full bg-blue-400"></span><span class="text-hub-text">Open</span></button>
+              <button onclick="bulkUpdate({status:'in_progress'})"
+                class="w-full px-3 py-1.5 text-xs hover:bg-hub-accent/10 text-left cursor-pointer flex items-center gap-2">
+                <span class="w-1.5 h-1.5 rounded-full bg-amber-400"></span><span class="text-hub-text">In Progress</span></button>
+              <button onclick="bulkUpdate({status:'done'})"
+                class="w-full px-3 py-1.5 text-xs hover:bg-hub-accent/10 text-left cursor-pointer flex items-center gap-2">
+                <span class="w-1.5 h-1.5 rounded-full bg-green-400"></span><span class="text-hub-text">Done</span></button>
+            </div>
+          </div>
+          <!-- Set priority -->
+          <div class="group relative">
+            <button onmouseenter="showSubmenu('priority-sub')" onclick="showSubmenu('priority-sub')"
+              class="w-full px-3 py-2 text-xs text-hub-text hover:bg-hub-accent/10 flex items-center justify-between cursor-pointer">
+              <span>Set priority</span><span class="text-hub-muted">▸</span>
+            </button>
+            <div id="priority-sub" class="hidden absolute left-full top-0 w-40 bg-hub-sidebar border border-hub-border rounded-lg shadow-xl py-1 -mt-0.5 ml-0.5">
+              <button onclick="bulkUpdate({priority:'critical'})"
+                class="w-full px-3 py-1.5 text-xs hover:bg-hub-accent/10 text-left cursor-pointer flex items-center gap-2">
+                <span class="w-1.5 h-1.5 rounded-full bg-red-600"></span><span class="text-hub-text">Critical</span></button>
+              <button onclick="bulkUpdate({priority:'high'})"
+                class="w-full px-3 py-1.5 text-xs hover:bg-hub-accent/10 text-left cursor-pointer flex items-center gap-2">
+                <span class="w-1.5 h-1.5 rounded-full bg-orange-500"></span><span class="text-hub-text">High</span></button>
+              <button onclick="bulkUpdate({priority:'medium'})"
+                class="w-full px-3 py-1.5 text-xs hover:bg-hub-accent/10 text-left cursor-pointer flex items-center gap-2">
+                <span class="w-1.5 h-1.5 rounded-full bg-yellow-600"></span><span class="text-hub-text">Medium</span></button>
+              <button onclick="bulkUpdate({priority:'low'})"
+                class="w-full px-3 py-1.5 text-xs hover:bg-hub-accent/10 text-left cursor-pointer flex items-center gap-2">
+                <span class="w-1.5 h-1.5 rounded-full bg-gray-600"></span><span class="text-hub-text">Low</span></button>
+            </div>
+          </div>
+        </div>
+      </div>
+      <button onclick="clearSelection()" class="px-2 py-1 text-xs text-hub-muted hover:text-hub-text cursor-pointer">
+        Cancel
+      </button>
+    </div>
+
+    <div
+      id="task-list"
+      hx-sse="connect: /workflow/api/task-updates{% if selected_project %}?project={{ selected_project }}{% endif %}{% if selected_status %}&status={{ selected_status }}{% endif %}"
+      hx-trigger="sse:task-update"
+      hx-swap="innerHTML"
+      hx-on="htmx:sseError: console.error('SSE error');"
+    >
+      {% for task in tasks %}
+      <div class="border-b border-hub-border/50 task-row" data-phase="{{ task.phase }}">
+      <div class="px-5 py-3 hover:bg-hub-bg/30 cursor-pointer" onclick="toggleTaskDetail({{ task.id }}, this)">
+        <div class="flex items-start gap-3">
+          <input type="checkbox" data-task-id="{{ task.id }}" onchange="event.stopPropagation(); updateBulkBar()"
+            onclick="event.stopPropagation()"
+            class="task-checkbox w-3.5 h-3.5 mt-0.5 rounded border-hub-border accent-hub-accent cursor-pointer shrink-0" />
+          <span class="text-xs font-mono text-hub-muted mt-0.5 shrink-0">#{{ task.id }}</span>
+          <div class="flex-1 min-w-0">
+            <div class="flex items-start justify-between gap-2">
+              <p class="text-sm text-hub-text leading-snug">{{ task.title }}</p>
+              {% if task.status != 'done' %}
+              <button
+                onclick="event.stopPropagation(); openSessionModal({{ task.id }}, '{{ task.title | replace("'", "\\'") }}', '{{ task.project_id }}')"
+                class="shrink-0 px-2 py-1 text-[10px] font-medium bg-hub-accent/10 text-hub-accent border border-hub-accent/30 rounded hover:bg-hub-accent/20 cursor-pointer"
+                title="Launch Claude Code session"
+              >
+                ▶ Claude
+              </button>
+              {% endif %}
+            </div>
+            <div class="flex items-center gap-2 mt-1.5 flex-wrap">
+              {% set prio_colors = {
+                "critical": "bg-red-600 text-white",
+                "high": "bg-orange-500 text-white",
+                "medium": "bg-yellow-600 text-white",
+                "low": "bg-gray-600 text-gray-200"
+              } %}
+              <span class="text-[10px] font-semibold uppercase px-1.5 py-0.5 rounded {{ prio_colors.get(task.priority, 'bg-gray-700 text-gray-300') }}">
+                {{ task.priority }}
+              </span>
+
+              {% set status_colors = {
+                "open": "text-blue-400",
+                "in_progress": "text-amber-400",
+                "done": "text-green-400"
+              } %}
+              <span class="text-[10px] {{ status_colors.get(task.status, 'text-hub-muted') }}">
+                {{ task.status | replace("_", " ") }}
+              </span>
+
+              <span class="text-[10px] text-hub-muted">{{ task.project_name }}</span>
+
+              {% if task.domain %}
+              <span class="text-[10px] text-hub-muted bg-hub-bg px-1.5 py-0.5 rounded">{{ task.domain }}</span>
+              {% endif %}
+
+              {% if task.pr_number %}
+              <a href="https://github.com/c0x12c-internal/service-insight/pull/{{ task.pr_number }}"
+                 target="_blank"
+                 class="text-[10px] text-hub-accent hover:underline">
+                PR #{{ task.pr_number }}
+              </a>
+              {% endif %}
+            </div>
+          </div>
+        </div>
+      </div>
+      <!-- Expandable detail panel -->
+      <div id="task-detail-{{ task.id }}" class="hidden bg-hub-bg/50 border-t border-hub-border/30">
+        <div class="px-5 py-3 text-xs text-hub-muted">Loading...</div>
+      </div>
+      </div>
+      {% endfor %}
+
+      {% if not tasks %}
+      <div class="px-5 py-8 text-center text-sm text-hub-muted">
+        No tasks found
+      </div>
+      {% endif %}
+    </div>
+  </div>
+</div>
+
+<!-- Session launch modal -->
+<div id="session-modal" class="fixed inset-0 bg-black/60 z-50 hidden items-center justify-center" onclick="closeSessionModal()">
+  <div class="bg-hub-sidebar border border-hub-border rounded-xl p-5 w-full max-w-lg mx-4 shadow-2xl" onclick="event.stopPropagation()">
+    <div class="flex items-center justify-between mb-4">
+      <h3 class="text-sm font-semibold text-hub-text">Launch Claude Code Session</h3>
+      <button onclick="closeSessionModal()" class="text-hub-muted hover:text-hub-text cursor-pointer">✕</button>
+    </div>
+
+    <p class="text-xs text-hub-muted mb-3" id="modal-task-title"></p>
+
+    <!-- New session -->
+    <button
+      onclick="launchNewSession()"
+      class="w-full mb-3 px-4 py-3 text-left bg-hub-card border border-hub-border rounded-lg hover:border-hub-accent cursor-pointer group"
+    >
+      <div class="text-sm font-medium text-hub-text group-hover:text-hub-accent">🆕 New Session</div>
+      <div class="text-xs text-hub-muted mt-0.5">Open new terminal with Claude Code and this task as prompt</div>
+    </button>
+
+    <!-- Active sessions + preview -->
+    <div class="text-xs text-hub-muted uppercase tracking-wider mb-2">Or resume existing session</div>
+    <div class="flex gap-3">
+      <!-- Session list -->
+      <div id="modal-sessions" class="space-y-2 max-h-64 overflow-y-auto w-1/2 shrink-0">
+        <div class="text-xs text-hub-muted py-2">Loading sessions...</div>
+      </div>
+      <!-- Preview panel -->
+      <div id="session-preview" class="w-1/2 bg-hub-bg border border-hub-border rounded-lg p-3 max-h-64 overflow-y-auto hidden">
+        <div class="text-[10px] text-hub-muted uppercase tracking-wider mb-2">Recent conversation</div>
+        <div id="preview-content" class="space-y-2"></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Domain Mapping modal -->
+<div id="domain-map-modal" class="fixed inset-0 bg-black/60 z-50 hidden items-center justify-center" onclick="closeDomainMapModal()">
+  <div class="bg-hub-sidebar border border-hub-border rounded-xl p-5 w-full max-w-md mx-4 shadow-2xl" onclick="event.stopPropagation()">
+    <div class="flex items-center justify-between mb-4">
+      <h3 class="text-sm font-semibold text-hub-text">Domain → Project Mapping</h3>
+      <button onclick="closeDomainMapModal()" class="text-hub-muted hover:text-hub-text cursor-pointer">✕</button>
+    </div>
+    <div id="domain-map-list" class="space-y-1 max-h-64 overflow-y-auto mb-4">
+      <div class="text-xs text-hub-muted">Loading...</div>
+    </div>
+    <div class="flex gap-2">
+      <input id="dm-domain" placeholder="domain" class="flex-1 px-2 py-1.5 text-xs bg-hub-card border border-hub-border rounded text-hub-text placeholder-hub-muted" />
+      <select id="dm-project" class="flex-1 px-2 py-1.5 text-xs bg-hub-card border border-hub-border rounded text-hub-muted">
+        {% for p in project_list %}
+        <option value="{{ p.id }}">{{ p.name }}</option>
+        {% endfor %}
+      </select>
+      <button onclick="addDomainMap()" class="px-3 py-1.5 text-xs font-medium bg-hub-accent text-hub-bg rounded hover:brightness-110 cursor-pointer">Add</button>
+    </div>
+  </div>
+</div>
+
+<script>
+  let modalTaskId = null;
+  let modalProjectId = null;
+
+  function openSessionModal(taskId, title, projectId) {
+    modalTaskId = taskId;
+    modalProjectId = projectId;
+    document.getElementById('modal-task-title').textContent = `Task #${taskId}: ${title}`;
+    document.getElementById('session-modal').classList.remove('hidden');
+    document.getElementById('session-modal').classList.add('flex');
+    loadSessions();
+  }
+
+  function closeSessionModal() {
+    document.getElementById('session-modal').classList.add('hidden');
+    document.getElementById('session-modal').classList.remove('flex');
+    document.getElementById('session-preview').classList.add('hidden');
+    document.getElementById('preview-content').innerHTML = '';
+    previewSessionId = null;
+    previewCwd = null;
+  }
+
+  async function loadSessions() {
+    const container = document.getElementById('modal-sessions');
+    try {
+      const resp = await fetch('/workflow/api/sessions');
+      const sessions = await resp.json();
+      const alive = sessions.filter(s => s.alive);
+      if (alive.length === 0) {
+        container.innerHTML = '<div class="text-xs text-hub-muted py-2">No active sessions</div>';
+        return;
+      }
+      container.innerHTML = alive.map(s => {
+        const name = s.name || s.cwd.split('/').pop() || 'unnamed';
+        const shortId = s.sessionId.slice(0, 8);
+        return `<button
+          onclick="previewSession('${s.sessionId}', '${s.cwd}')"
+          class="w-full px-3 py-2 text-left bg-hub-bg border border-hub-border rounded-lg hover:border-hub-accent cursor-pointer session-btn"
+          data-sid="${s.sessionId}"
+        >
+          <div class="flex items-center justify-between">
+            <span class="text-xs font-medium text-hub-text">${name}</span>
+            <span class="text-[10px] text-green-400">● live</span>
+          </div>
+          <div class="text-[10px] text-hub-muted mt-0.5 font-mono">${shortId} — ${s.cwd}</div>
+        </button>`;
+      }).join('');
+    } catch (e) {
+      container.innerHTML = '<div class="text-xs text-red-400 py-2">Failed to load sessions</div>';
+    }
+  }
+
+  let previewSessionId = null;
+  let previewCwd = null;
+
+  async function previewSession(sessionId, cwd) {
+    previewSessionId = sessionId;
+    previewCwd = cwd;
+
+    // Highlight selected session
+    document.querySelectorAll('.session-btn').forEach(btn => {
+      btn.classList.toggle('border-hub-accent', btn.dataset.sid === sessionId);
+      btn.classList.toggle('ring-1', btn.dataset.sid === sessionId);
+      btn.classList.toggle('ring-hub-accent', btn.dataset.sid === sessionId);
+    });
+
+    const panel = document.getElementById('session-preview');
+    const content = document.getElementById('preview-content');
+    panel.classList.remove('hidden');
+    content.innerHTML = '<div class="text-xs text-hub-muted">Loading preview...</div>';
+
+    try {
+      const resp = await fetch(`/workflow/api/sessions/${sessionId}/preview`);
+      const data = await resp.json();
+
+      if (data.turns.length === 0) {
+        content.innerHTML = '<div class="text-xs text-hub-muted">No conversation history</div>';
+        return;
+      }
+
+      const roleColors = { user: 'text-hub-accent', assistant: 'text-green-400' };
+      const roleLabels = { user: 'You', assistant: 'Claude' };
+
+      let html = `<div class="text-[10px] text-hub-muted mb-2">${data.totalTurns} total turns — showing last ${data.turns.length}</div>`;
+      html += data.turns.map(t => {
+        const color = roleColors[t.role] || 'text-hub-muted';
+        const label = roleLabels[t.role] || t.role;
+        const text = t.text.length > 200 ? t.text.slice(0, 200) + '…' : t.text;
+        // Escape HTML
+        const safe = text.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+        return `<div class="text-[11px] leading-relaxed">
+          <span class="${color} font-semibold">${label}:</span>
+          <span class="text-hub-text/80">${safe}</span>
+        </div>`;
+      }).join('');
+
+      html += `<button
+        onclick="resumeSession('${sessionId}', '${cwd}')"
+        class="mt-3 w-full px-3 py-2 text-xs font-semibold bg-hub-accent text-hub-bg rounded-lg hover:brightness-110 cursor-pointer"
+      >Resume this session</button>`;
+
+      content.innerHTML = html;
+    } catch (e) {
+      content.innerHTML = '<div class="text-xs text-red-400">Failed to load preview</div>';
+    }
+  }
+
+  async function launchNewSession() {
+    closeSessionModal();
+    try {
+      await fetch('/workflow/api/launch-session', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({ taskId: modalTaskId })
+      });
+    } catch (e) {
+      console.error('Failed to launch session:', e);
+    }
+  }
+
+  async function resumeSession(sessionId, cwd) {
+    closeSessionModal();
+    try {
+      await fetch('/workflow/api/launch-session', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({ sessionId, projectDir: cwd })
+      });
+    } catch (e) {
+      console.error('Failed to resume session:', e);
+    }
+  }
+
+  // ── Task Detail ──────────────────────────────────────────────
+  const loadedDetails = new Set();
+
+  async function toggleTaskDetail(taskId, rowEl) {
+    const panel = document.getElementById('task-detail-' + taskId);
+    if (!panel) return;
+
+    // Toggle visibility
+    if (!panel.classList.contains('hidden')) {
+      panel.classList.add('hidden');
+      return;
+    }
+
+    // Close other open panels
+    document.querySelectorAll('[id^="task-detail-"]').forEach(p => {
+      if (p.id !== 'task-detail-' + taskId) p.classList.add('hidden');
+    });
+
+    panel.classList.remove('hidden');
+
+    // Load data once
+    if (loadedDetails.has(taskId)) return;
+    loadedDetails.add(taskId);
+
+    try {
+      const resp = await fetch('/workflow/api/tasks/' + taskId + '/detail');
+      const data = await resp.json();
+      panel.innerHTML = renderTaskDetail(data);
+    } catch (e) {
+      panel.innerHTML = '<div class="px-5 py-3 text-xs text-red-400">Failed to load details</div>';
+    }
+  }
+
+  function renderTaskDetail(data) {
+    const t = data.task;
+    const statusColors = { open: 'text-blue-400', in_progress: 'text-amber-400', done: 'text-green-400' };
+    const prioColors = { critical: 'bg-red-600', high: 'bg-orange-500', medium: 'bg-yellow-600', low: 'bg-gray-600' };
+
+    let html = '<div class="px-5 py-4 space-y-4">';
+
+    // ── Project suggestion (if inferred project differs from current)
+    html += `<div id="project-suggestion-${t.id}" class="text-xs"></div>`;
+
+    // ── Status bar
+    html += '<div class="flex flex-wrap items-center gap-3 text-xs">';
+    html += `<span class="px-2 py-0.5 rounded text-white font-semibold ${prioColors[t.priority] || 'bg-gray-600'}">${t.priority}</span>`;
+    html += `<span class="${statusColors[t.status] || 'text-hub-muted'} font-medium">${t.status.replace('_', ' ')}</span>`;
+    if (t.domain) html += `<span class="text-hub-muted bg-hub-card px-2 py-0.5 rounded">${t.domain}</span>`;
+    if (t.pr_number) html += `<a href="https://github.com/c0x12c-internal/service-insight/pull/${t.pr_number}" target="_blank" class="text-hub-accent hover:underline">PR #${t.pr_number}</a>`;
+    if (t.branch) html += `<span class="font-mono text-hub-muted">${t.branch}</span>`;
+    html += `<span class="text-hub-muted ml-auto">Created ${t.created_at}</span>`;
+    html += '</div>';
+
+    // Load project suggestion asynchronously
+    setTimeout(() => loadProjectSuggestion(t.id, t.domain, t.description, t.project_name), 0);
+
+    // ── Description
+    if (t.description) {
+      const safe = t.description.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+      html += `<details class="group">
+        <summary class="text-[11px] text-hub-muted uppercase tracking-wider cursor-pointer hover:text-hub-text">Description</summary>
+        <pre class="mt-2 text-xs text-hub-text/80 whitespace-pre-wrap leading-relaxed max-h-48 overflow-y-auto bg-hub-card rounded-lg p-3 border border-hub-border">${safe}</pre>
+      </details>`;
+    }
+
+    // ── Progress timeline
+    if (data.steps.length > 0) {
+      html += '<div>';
+      html += '<div class="text-[11px] text-hub-muted uppercase tracking-wider mb-2">Progress</div>';
+      html += '<div class="space-y-1 border-l-2 border-hub-border pl-3">';
+      const stepIcons = { status: '●', imported: '📥' };
+      data.steps.forEach(s => {
+        const icon = stepIcons[s.field] || '○';
+        const color = s.label.includes('done') ? 'text-green-400' : s.label.includes('in_progress') ? 'text-amber-400' : 'text-hub-muted';
+        html += `<div class="flex items-center gap-2 text-xs">
+          <span class="${color}">${icon}</span>
+          <span class="text-hub-text/80">${s.label}</span>
+          <span class="text-hub-muted ml-auto text-[10px]">${s.timestamp}</span>
+        </div>`;
+      });
+      html += '</div></div>';
+    }
+
+    // ── Notes
+    if (data.notes.length > 0) {
+      html += '<div>';
+      html += '<div class="text-[11px] text-hub-muted uppercase tracking-wider mb-2">Notes</div>';
+      data.notes.forEach(n => {
+        const safe = n.content.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+        html += `<div class="text-xs text-hub-text/80 bg-hub-card rounded p-2 border border-hub-border mb-1">
+          <pre class="whitespace-pre-wrap">${safe}</pre>
+          <div class="text-[10px] text-hub-muted mt-1">${n.added_by || ''} — ${n.created_at}</div>
+        </div>`;
+      });
+      html += '</div>';
+    }
+
+    // ── Related docs (lazy load)
+    if (data.docs.length > 0) {
+      html += '<div>';
+      html += '<div class="text-[11px] text-hub-muted uppercase tracking-wider mb-2">Related Documents</div>';
+      data.docs.forEach((d, i) => {
+        const docId = 'doc-' + data.task.id + '-' + i;
+        html += `<details class="group mb-1">
+          <summary onclick="lazyLoadDoc('${docId}', '${d.path.replace(/'/g, "\\'")}')"
+                   class="text-xs text-hub-accent hover:underline cursor-pointer flex items-center gap-1">
+            <span class="text-hub-muted">${d.type}:</span> ${d.path.split('/').pop()}
+          </summary>
+          <div id="${docId}" class="mt-1 text-xs bg-hub-card rounded-lg p-3 border border-hub-border max-h-64 overflow-y-auto">
+            <span class="text-hub-muted">Click to load...</span>
+          </div>
+        </details>`;
+      });
+      html += '</div>';
+    }
+
+    html += '</div>';
+    return html;
+  }
+
+  async function lazyLoadDoc(elementId, path) {
+    const el = document.getElementById(elementId);
+    if (!el || el.dataset.loaded) return;
+    el.dataset.loaded = '1';
+    el.innerHTML = '<span class="text-hub-muted">Loading...</span>';
+    try {
+      const resp = await fetch('/workflow/api/docs/read?path=' + encodeURIComponent(path));
+      const data = await resp.json();
+      if (data.error) {
+        el.innerHTML = `<span class="text-red-400">${data.error}</span>`;
+      } else {
+        const safe = data.content.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+        el.innerHTML = `<pre class="whitespace-pre-wrap text-hub-text/80 leading-relaxed">${safe}</pre>` +
+          (data.truncated ? '<div class="text-hub-muted mt-1">...truncated at 200 lines</div>' : '');
+      }
+    } catch (e) {
+      el.innerHTML = '<span class="text-red-400">Failed to load</span>';
+    }
+  }
+
+  // ── Project Inference ────────────────────────────────────────
+  async function loadProjectSuggestion(taskId, domain, description, currentProject) {
+    const container = document.getElementById('project-suggestion-' + taskId);
+    if (!container) return;
+
+    try {
+      const params = new URLSearchParams();
+      if (domain) params.append('domain', domain);
+      if (description) params.append('description', description);
+
+      const resp = await fetch('/workflow/api/infer-project?' + params);
+      const data = await resp.json();
+
+      if (!data.inferred_project || data.inferred_project === currentProject) {
+        container.innerHTML = '';
+        return;
+      }
+
+      // Show warning: task is in wrong project
+      const colors = data.confidence === 'high'
+        ? 'bg-amber-900/40 border-amber-700 text-amber-300'
+        : 'bg-blue-900/30 border-blue-700 text-blue-300';
+
+      let html = `<div class="border rounded-lg p-2 ${colors}">`;
+      html += `<div class="flex items-start gap-2">`;
+      html += data.confidence === 'high' ? '⚠' : 'ℹ';
+      html += `<div class="flex-1 text-xs">`;
+      html += `<div class="font-medium">${data.suggestion}</div>`;
+      html += `<div class="text-[11px] opacity-80">Currently in: ${currentProject}</div>`;
+      html += `<button onclick="moveTaskToProject(${taskId}, '${data.inferred_project}')" class="mt-1.5 text-[10px] font-medium underline hover:brightness-110">Move task →</button>`;
+      html += `</div></div></div>`;
+
+      container.innerHTML = html;
+    } catch (e) {
+      console.error('Failed to load project suggestion:', e);
+    }
+  }
+
+  async function moveTaskToProject(taskId, projectId) {
+    try {
+      const resp = await fetch(`/workflow/api/tasks/${taskId}/move`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ project_id: projectId }),
+      });
+      const data = await resp.json();
+      if (data.ok) {
+        // Reload dashboard
+        window.location.reload();
+      } else {
+        alert('Failed to move task: ' + (data.error || 'Unknown error'));
+      }
+    } catch (e) {
+      alert('Failed to move task: ' + e.message);
+    }
+  }
+
+  function applyFilters() {
+    const project = document.getElementById('filter-project').value;
+    const status = document.getElementById('filter-status').value;
+    const q = document.getElementById('filter-search').value.trim();
+    const params = new URLSearchParams();
+    if (project) params.set('project', project);
+    if (status) params.set('status', status);
+    if (q) params.set('q', q);
+    const qs = params.toString();
+    window.location.href = '/workflow/' + (qs ? '?' + qs : '');
+  }
+
+  let _searchTimer = null;
+  function scheduleSearch() {
+    clearTimeout(_searchTimer);
+    _searchTimer = setTimeout(applyFilters, 450);
+  }
+
+  // ── Misplaced Tasks ────────────────────────────────────────
+  async function loadMisplacedTasks() {
+    try {
+      const project = document.getElementById('filter-project').value;
+      const url = '/workflow/api/misplaced-tasks' + (project ? '?project=' + project : '');
+      const resp = await fetch(url);
+      const tasks = await resp.json();
+      const banner = document.getElementById('misplaced-banner');
+      if (tasks.length === 0) {
+        banner.classList.add('hidden');
+        return;
+      }
+      banner.classList.remove('hidden');
+      document.getElementById('misplaced-count').textContent =
+        `${tasks.length} task${tasks.length > 1 ? 's' : ''} may belong to a different project`;
+
+      const list = document.getElementById('misplaced-list');
+      list.innerHTML = tasks.map(t => `
+        <div class="flex items-center justify-between bg-hub-card/50 rounded-lg px-3 py-2">
+          <div class="flex items-center gap-2 min-w-0">
+            <span class="text-xs font-mono text-hub-muted shrink-0">#${t.id}</span>
+            <span class="text-xs text-hub-text truncate">${t.title}</span>
+            <span class="text-[10px] text-hub-muted bg-hub-bg px-1.5 py-0.5 rounded shrink-0">${t.domain}</span>
+          </div>
+          <div class="flex items-center gap-2 shrink-0 ml-2">
+            <span class="text-[10px] text-hub-muted">${t.current_project_name} →</span>
+            <button onclick="moveTask(${t.id}, '${t.suggested_project}')"
+              class="px-2 py-1 text-[10px] font-medium bg-amber-600/20 text-amber-300 border border-amber-700/50 rounded hover:bg-amber-600/30 cursor-pointer">
+              Move to ${t.suggested_project_name}
+            </button>
+          </div>
+        </div>
+      `).join('');
+    } catch (e) {
+      console.error('Failed to load misplaced tasks:', e);
+    }
+  }
+
+  function toggleMisplacedList() {
+    const list = document.getElementById('misplaced-list');
+    const btn = document.getElementById('misplaced-toggle');
+    list.classList.toggle('hidden');
+    btn.textContent = list.classList.contains('hidden') ? 'Show' : 'Hide';
+  }
+
+  async function moveTask(taskId, projectId) {
+    try {
+      await fetch(`/workflow/api/tasks/${taskId}/move`, {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({ project_id: projectId })
+      });
+      window.location.reload();
+    } catch (e) {
+      console.error('Failed to move task:', e);
+    }
+  }
+
+  // ── Domain Mapping ────────────────────────────────────────
+  function openDomainMapModal() {
+    document.getElementById('domain-map-modal').classList.remove('hidden');
+    document.getElementById('domain-map-modal').classList.add('flex');
+    loadDomainMap();
+  }
+
+  function closeDomainMapModal() {
+    document.getElementById('domain-map-modal').classList.add('hidden');
+    document.getElementById('domain-map-modal').classList.remove('flex');
+  }
+
+  async function loadDomainMap() {
+    const container = document.getElementById('domain-map-list');
+    try {
+      const resp = await fetch('/workflow/api/domain-map');
+      const mappings = await resp.json();
+      if (mappings.length === 0) {
+        container.innerHTML = '<div class="text-xs text-hub-muted py-2">No mappings configured</div>';
+        return;
+      }
+      container.innerHTML = mappings.map(m => `
+        <div class="flex items-center justify-between bg-hub-card rounded px-3 py-1.5">
+          <div class="flex items-center gap-2 text-xs">
+            <span class="text-hub-text font-medium">${m.domain}</span>
+            <span class="text-hub-muted">→</span>
+            <span class="text-hub-accent">${m.project_id}</span>
+            ${m.pattern ? `<span class="text-hub-muted text-[10px]">(${m.pattern})</span>` : ''}
+          </div>
+          <button onclick="removeDomainMap('${m.domain}', '${m.project_id}')"
+            class="text-[10px] text-red-400 hover:text-red-300 cursor-pointer">✕</button>
+        </div>
+      `).join('');
+    } catch (e) {
+      container.innerHTML = '<div class="text-xs text-red-400">Failed to load</div>';
+    }
+  }
+
+  async function addDomainMap() {
+    const domain = document.getElementById('dm-domain').value.trim();
+    const projectId = document.getElementById('dm-project').value;
+    if (!domain) return;
+    await fetch('/workflow/api/domain-map', {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({ domain, project_id: projectId })
+    });
+    document.getElementById('dm-domain').value = '';
+    loadDomainMap();
+    loadMisplacedTasks();
+  }
+
+  async function removeDomainMap(domain, projectId) {
+    await fetch('/workflow/api/domain-map', {
+      method: 'DELETE',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({ domain, project_id: projectId })
+    });
+    loadDomainMap();
+    loadMisplacedTasks();
+  }
+
+  // ── Bulk Selection ─────────────────────────────────────────
+  function getSelectedIds() {
+    return Array.from(document.querySelectorAll('.task-checkbox:checked'))
+      .map(cb => parseInt(cb.dataset.taskId));
+  }
+
+  function updateBulkBar() {
+    const ids = getSelectedIds();
+    const bar = document.getElementById('bulk-bar');
+    if (ids.length > 0) {
+      bar.classList.remove('hidden');
+      bar.classList.add('flex');
+      document.getElementById('bulk-count').textContent = `${ids.length} selected`;
+    } else {
+      bar.classList.add('hidden');
+      bar.classList.remove('flex');
+    }
+    // Update select-all checkbox state
+    const all = document.querySelectorAll('.task-checkbox');
+    const checked = document.querySelectorAll('.task-checkbox:checked');
+    const selectAll = document.getElementById('select-all');
+    selectAll.checked = all.length > 0 && checked.length === all.length;
+    selectAll.indeterminate = checked.length > 0 && checked.length < all.length;
+  }
+
+  function toggleSelectAll(checked) {
+    // Only toggle visible (not display:none) task rows
+    document.querySelectorAll('.task-row').forEach(row => {
+      if (row.style.display !== 'none') {
+        const cb = row.querySelector('.task-checkbox');
+        if (cb) cb.checked = checked;
+      }
+    });
+    updateBulkBar();
+  }
+
+  function clearSelection() {
+    document.querySelectorAll('.task-checkbox').forEach(cb => cb.checked = false);
+    document.getElementById('select-all').checked = false;
+    updateBulkBar();
+  }
+
+  async function bulkMove(projectId) {
+    const ids = getSelectedIds();
+    if (ids.length === 0 || !projectId) return;
+    closeBulkMenu();
+    try {
+      const resp = await fetch('/workflow/api/tasks/bulk-move', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({ task_ids: ids, project_id: projectId })
+      });
+      const data = await resp.json();
+      if (data.ok) window.location.reload();
+    } catch (e) {
+      console.error('Bulk move failed:', e);
+    }
+  }
+
+  async function bulkUpdate(fields) {
+    const ids = getSelectedIds();
+    if (ids.length === 0) return;
+    closeBulkMenu();
+    try {
+      const resp = await fetch('/workflow/api/tasks/bulk-update', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({ task_ids: ids, ...fields })
+      });
+      const data = await resp.json();
+      if (data.ok) window.location.reload();
+    } catch (e) {
+      console.error('Bulk update failed:', e);
+    }
+  }
+
+  // ── Context Menu ──────────────────────────────────────────
+  let _activeSubmenu = null;
+
+  function toggleBulkMenu() {
+    const menu = document.getElementById('bulk-menu');
+    if (menu.classList.contains('hidden')) {
+      menu.classList.remove('hidden');
+      document.addEventListener('click', closeBulkMenuOnOutside);
+    } else {
+      closeBulkMenu();
+    }
+  }
+
+  function closeBulkMenu() {
+    document.getElementById('bulk-menu').classList.add('hidden');
+    hideAllSubmenus();
+    document.removeEventListener('click', closeBulkMenuOnOutside);
+  }
+
+  function closeBulkMenuOnOutside(e) {
+    const menu = document.getElementById('bulk-menu');
+    const btn = document.getElementById('bulk-actions-btn');
+    if (!menu.contains(e.target) && !btn.contains(e.target)) {
+      closeBulkMenu();
+    }
+  }
+
+  function showSubmenu(id) {
+    hideAllSubmenus();
+    document.getElementById(id).classList.remove('hidden');
+    _activeSubmenu = id;
+  }
+
+  function hideAllSubmenus() {
+    ['move-sub', 'status-sub', 'priority-sub'].forEach(id => {
+      document.getElementById(id).classList.add('hidden');
+    });
+    _activeSubmenu = null;
+  }
+
+  // Load misplaced tasks on page load
+  loadMisplacedTasks();
+
+  let activePhase = null;
+
+  function filterPhase(phase) {
+    activePhase = (activePhase === phase) ? null : phase;
+
+    // Update title
+    const titles = {
+      intake: "Intake", backlog: "Backlog", implement: "Implement",
+      pr_ci: "PR & CI", review: "Review", deploy: "Deploy",
+      verify: "Verify", close: "Close"
+    };
+    document.getElementById('task-list-title').textContent =
+      activePhase ? titles[activePhase] : 'All Tasks';
+
+    // Filter task rows
+    document.querySelectorAll('.task-row').forEach(row => {
+      if (!activePhase || row.dataset.phase === activePhase) {
+        row.style.display = '';
+      } else {
+        row.style.display = 'none';
+      }
+    });
+
+    // Highlight active phase button
+    document.querySelectorAll('#pipeline button').forEach(btn => {
+      if (btn.dataset.phase === activePhase) {
+        btn.classList.add('ring-2', 'ring-hub-accent');
+      } else {
+        btn.classList.remove('ring-2', 'ring-hub-accent');
+      }
+    });
+  }
+</script>
+{% endblock %}

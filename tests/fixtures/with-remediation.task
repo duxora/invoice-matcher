@@ -1,0 +1,7 @@
+# name: Remediation Task
+# schedule: daily 11:00
+# on_failure: investigate
+# remediation_tools: Read,Grep,Bash(npm install *)
+# remediation_max_turns: 10
+---
+A task with auto-remediation.

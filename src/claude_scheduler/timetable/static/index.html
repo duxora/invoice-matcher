@@ -1,0 +1,587 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Family Timetable</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          colors: {
+            hub: { bg: '#0f172a', sidebar: '#1e293b', card: '#1e293b', border: '#334155', text: '#e2e8f0', muted: '#94a3b8', accent: '#38bdf8' }
+          }
+        }
+      }
+    }
+  </script>
+  <script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.x.x/dist/cdn.min.js"></script>
+  <style>[x-cloak]{display:none !important}</style>
+</head>
+<body class="bg-hub-bg text-hub-text min-h-screen flex" x-data="app()" x-cloak>
+
+  <!-- Sidebar (desktop) -->
+  <aside class="w-48 bg-hub-sidebar border-r border-hub-border flex-col fixed h-full hidden sm:flex">
+    <a @click.prevent="goWeek()" href="#" class="block px-4 py-3 text-base font-bold border-b border-hub-border hover:text-hub-accent">📅 Timetable</a>
+    <nav class="flex-1 py-3 overflow-y-auto">
+      <a @click.prevent="goWeek()" href="#" class="block px-4 py-1.5 text-xs transition-colors" :class="view==='week'?'text-hub-accent':'text-hub-muted hover:text-hub-text'">Week View</a>
+      <a @click.prevent="goMonth(monthYear,monthMonth)" href="#" class="block px-4 py-1.5 text-xs transition-colors" :class="view==='month'?'text-hub-accent':'text-hub-muted hover:text-hub-text'">Month View</a>
+      <a @click.prevent="loadTemplates();view='templates'" href="#" class="block px-4 py-1.5 text-xs transition-colors" :class="view==='templates'?'text-hub-accent':'text-hub-muted hover:text-hub-text'">Templates</a>
+      <a @click.prevent="loadActivity();view='activity'" href="#" class="block px-4 py-1.5 text-xs transition-colors" :class="view==='activity'?'text-hub-accent':'text-hub-muted hover:text-hub-text'">Activity</a>
+      <a @click.prevent="loadColors();view='colors'" href="#" class="block px-4 py-1.5 text-xs transition-colors" :class="view==='colors'?'text-hub-accent':'text-hub-muted hover:text-hub-text'">Colors</a>
+      <a href="/api/export.ics" class="block px-4 py-1.5 text-xs text-hub-muted hover:text-hub-text">Export iCal</a>
+    </nav>
+  </aside>
+
+  <!-- Mobile nav -->
+  <div class="sm:hidden fixed top-0 left-0 right-0 z-10 bg-hub-sidebar border-b border-hub-border px-3 py-2 flex items-center justify-between">
+    <span class="font-bold text-sm">📅 Timetable</span>
+    <div class="flex gap-2 text-xs">
+      <a @click.prevent="goWeek()" href="#" class="text-hub-muted hover:text-hub-accent">Week</a>
+      <a @click.prevent="goMonth(monthYear,monthMonth)" href="#" class="text-hub-muted hover:text-hub-accent">Month</a>
+      <a @click.prevent="goAdd()" href="#" class="text-hub-accent">+ Add</a>
+    </div>
+  </div>
+
+  <!-- Main content -->
+  <main class="sm:ml-48 flex-1 p-4 sm:p-6 min-h-screen mt-10 sm:mt-0">
+
+    <!-- Loading -->
+    <div x-show="loading" class="flex items-center justify-center min-h-[60vh]">
+      <p class="text-hub-muted">Loading...</p>
+    </div>
+
+    <!-- WEEK VIEW -->
+    <div x-show="!loading && view==='week'" x-transition>
+      <template x-if="weekData">
+        <div>
+          <!-- Header -->
+          <div class="mb-6 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
+            <div>
+              <h1 class="text-2xl font-bold" x-text="t('family_timetable')"></h1>
+              <p class="text-hub-muted text-sm" x-text="weekData.week_label"></p>
+            </div>
+            <div class="flex flex-wrap items-center gap-2">
+              <button @click="goWeek(weekData.prev_week)" class="text-hub-muted hover:text-hub-text text-sm px-2 py-1">&larr; Prev</button>
+              <button @click="goWeek()" class="text-hub-muted hover:text-hub-text text-sm px-2 py-1">Today</button>
+              <button @click="goWeek(weekData.next_week)" class="text-hub-muted hover:text-hub-text text-sm px-2 py-1">Next &rarr;</button>
+              <button @click="goMonth(monthYear,monthMonth)" class="text-hub-muted hover:text-hub-text text-sm px-2 py-1">Month</button>
+              <button @click="goAdd()" class="bg-sky-500 hover:bg-sky-600 text-white px-3 py-1.5 rounded text-sm">+ Add</button>
+            </div>
+          </div>
+
+          <!-- Member filter -->
+          <div class="flex flex-wrap gap-2 mb-4">
+            <button @click="selectedMember='';goWeek(weekData.days[0]?.date)"
+              class="px-3 py-1 rounded-full text-xs border transition-colors"
+              :class="!selectedMember?'bg-hub-accent/20 border-hub-accent text-hub-accent':'border-hub-border text-hub-muted hover:text-hub-text'">All</button>
+            <template x-for="m in config.family_members" :key="m">
+              <button @click="selectedMember=m;goWeek(weekData.days[0]?.date)"
+                class="px-3 py-1 rounded-full text-xs border transition-colors"
+                :class="selectedMember===m ? (memberColor(m).bg+' '+memberColor(m).border+' '+memberColor(m).text) : 'border-hub-border text-hub-muted hover:text-hub-text'"
+                x-text="m"></button>
+            </template>
+          </div>
+
+          <!-- Warnings -->
+          <template x-if="weekData.overdue?.length">
+            <div class="bg-red-500/10 border border-red-500/30 rounded-lg p-3 mb-4">
+              <span class="text-red-400 text-sm font-medium" x-text="weekData.overdue.length+' overdue'"></span>
+            </div>
+          </template>
+          <template x-if="weekData.reminders?.length">
+            <div class="bg-yellow-500/10 border border-yellow-500/30 rounded-lg p-3 mb-4">
+              <span class="text-yellow-400 text-sm font-medium" x-text="weekData.reminders.length+' pending reminder(s)'"></span>
+            </div>
+          </template>
+
+          <!-- Week grid -->
+          <div class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 lg:grid-cols-7 gap-2">
+            <template x-for="day in weekData.days" :key="day.date">
+              <div class="bg-hub-card border rounded-lg p-3 min-h-[140px] lg:min-h-[200px]"
+                   :class="day.is_today?'border-hub-accent ring-1 ring-hub-accent/30':'border-hub-border'">
+                <a @click.prevent="goDay(day.date)" href="#"
+                   class="block text-sm font-medium mb-2 hover:text-hub-accent transition-colors"
+                   :class="day.is_today?'text-hub-accent':''">
+                  <span x-text="day.label"></span>
+                  <span x-show="day.is_today" class="ml-1 text-[10px] bg-hub-accent/20 px-1.5 py-0.5 rounded-full">Today</span>
+                </a>
+                <div class="space-y-1">
+                  <template x-for="(entry, ei) in day.entries.slice(0,6)" :key="ei">
+                    <div class="border-l-2 rounded-r px-2 py-1"
+                         :class="memberColor(entry.Person||entry.Participants||'Family').bg + ' ' + memberColor(entry.Person||entry.Participants||'Family').border + (entry.Status==='done'||entry.Done?' opacity-50 line-through':'')">
+                      <div class="text-xs" :class="memberColor(entry.Person||entry.Participants||'Family').text" x-text="entry.Time||entry['Start Time']||''"></div>
+                      <div class="text-xs truncate" x-text="entry.Title||entry.Subject||''"></div>
+                      <div class="text-[10px] text-hub-muted" x-text="entry.Person||entry.Participants||''"></div>
+                    </div>
+                  </template>
+                  <a x-show="day.entries.length>6" @click.prevent="goDay(day.date)" href="#" class="text-[10px] text-hub-accent" x-text="'+'+(day.entries.length-6)+' more'"></a>
+                </div>
+              </div>
+            </template>
+          </div>
+
+          <!-- Legend -->
+          <div class="mt-4 flex flex-wrap gap-3 text-xs text-hub-muted">
+            <template x-for="m in config.family_members" :key="'legend-'+m">
+              <span class="flex items-center gap-1">
+                <span class="w-3 h-3 rounded border" :class="memberColor(m).bg+' '+memberColor(m).border"></span>
+                <span x-text="m"></span>
+              </span>
+            </template>
+          </div>
+        </div>
+      </template>
+    </div>
+
+    <!-- MONTH VIEW -->
+    <div x-show="!loading && view==='month'" x-transition>
+      <template x-if="monthData">
+        <div>
+          <div class="mb-6 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
+            <div>
+              <h1 class="text-2xl font-bold" x-text="t('family_timetable')"></h1>
+              <p class="text-hub-muted text-sm" x-text="monthData.month_label"></p>
+            </div>
+            <div class="flex flex-wrap items-center gap-2">
+              <button @click="goMonth(monthData.prev_year,monthData.prev_month)" class="text-hub-muted hover:text-hub-text text-sm px-2 py-1">&larr; Prev</button>
+              <button @click="goMonth(new Date().getFullYear(),new Date().getMonth()+1)" class="text-hub-muted hover:text-hub-text text-sm px-2 py-1">Today</button>
+              <button @click="goMonth(monthData.next_year,monthData.next_month)" class="text-hub-muted hover:text-hub-text text-sm px-2 py-1">Next &rarr;</button>
+              <button @click="goWeek()" class="text-hub-muted hover:text-hub-text text-sm px-2 py-1">Week</button>
+              <button @click="goAdd()" class="bg-sky-500 hover:bg-sky-600 text-white px-3 py-1.5 rounded text-sm">+ Add</button>
+            </div>
+          </div>
+          <!-- Member filter -->
+          <div class="flex flex-wrap gap-2 mb-4">
+            <button @click="selectedMember='';goMonth(monthData.year,monthData.month)" class="px-3 py-1 rounded-full text-xs border transition-colors" :class="!selectedMember?'bg-hub-accent/20 border-hub-accent text-hub-accent':'border-hub-border text-hub-muted'">All</button>
+            <template x-for="m in config.family_members" :key="'mf-'+m">
+              <button @click="selectedMember=m;goMonth(monthData.year,monthData.month)" class="px-3 py-1 rounded-full text-xs border transition-colors" :class="selectedMember===m?(memberColor(m).bg+' '+memberColor(m).border+' '+memberColor(m).text):'border-hub-border text-hub-muted'" x-text="m"></button>
+            </template>
+          </div>
+          <!-- Day headers -->
+          <div class="hidden sm:grid grid-cols-7 gap-1 mb-1">
+            <template x-for="dn in ['Mon','Tue','Wed','Thu','Fri','Sat','Sun']" :key="dn">
+              <div class="text-center text-xs text-hub-muted font-medium py-1" x-text="dn"></div>
+            </template>
+          </div>
+          <!-- Calendar grid -->
+          <div class="grid grid-cols-7 gap-1">
+            <template x-for="week in monthData.weeks" :key="week[0].date">
+              <template x-for="day in week" :key="day.date">
+                <div class="bg-hub-card border rounded min-h-[80px] sm:min-h-[100px] p-1.5"
+                     :class="(day.is_today?'border-hub-accent ring-1 ring-hub-accent/30':'border-hub-border') + (!day.in_month?' opacity-40':'')">
+                  <a @click.prevent="goDay(day.date)" href="#" class="block text-xs font-medium mb-1 hover:text-hub-accent" :class="day.is_today?'text-hub-accent':''">
+                    <span x-text="day.day"></span>
+                    <span x-show="day.is_today" class="ml-0.5 text-[8px] bg-hub-accent/20 px-1 py-0.5 rounded-full">Today</span>
+                  </a>
+                  <div class="space-y-0.5">
+                    <template x-for="(entry,ei) in day.entries.slice(0,3)" :key="ei">
+                      <div class="rounded px-1 py-0.5" :class="memberColor(entry.Person||entry.Participants||'Family').bg + (entry.Status==='done'||entry.Done?' opacity-50 line-through':'')">
+                        <div class="text-[10px] truncate" x-text="entry.Title||entry.Subject||''"></div>
+                      </div>
+                    </template>
+                    <a x-show="day.entries.length>3" @click.prevent="goDay(day.date)" href="#" class="text-[9px] text-hub-accent" x-text="'+'+(day.entries.length-3)"></a>
+                  </div>
+                </div>
+              </template>
+            </template>
+          </div>
+          <!-- Legend -->
+          <div class="mt-4 flex flex-wrap gap-3 text-xs text-hub-muted">
+            <template x-for="m in config.family_members" :key="'ml-'+m">
+              <span class="flex items-center gap-1"><span class="w-3 h-3 rounded border" :class="memberColor(m).bg+' '+memberColor(m).border"></span><span x-text="m"></span></span>
+            </template>
+          </div>
+        </div>
+      </template>
+    </div>
+
+    <!-- DAY VIEW -->
+    <div x-show="!loading && view==='day'" x-transition>
+      <template x-if="dayData">
+        <div>
+          <div class="mb-2">
+            <a @click.prevent="goWeek()" href="#" class="text-hub-accent text-sm hover:underline">&larr; Back to Week</a>
+          </div>
+          <div class="mb-6 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
+            <div>
+              <h1 class="text-2xl font-bold" x-text="dayData.date_label"></h1>
+            </div>
+            <div class="flex gap-2">
+              <button @click="goAdd(dayData.date_str)" class="bg-sky-500 hover:bg-sky-600 text-white px-3 py-1.5 rounded text-sm">+ Add</button>
+            </div>
+          </div>
+          <!-- Member filter -->
+          <div class="flex flex-wrap gap-2 mb-4">
+            <button @click="selectedMember='';loadDay(dayData.date_str)" class="px-3 py-1 rounded-full text-xs border transition-colors" :class="!selectedMember?'bg-hub-accent/20 border-hub-accent text-hub-accent':'border-hub-border text-hub-muted'">All</button>
+            <template x-for="m in config.family_members" :key="'df-'+m">
+              <button @click="selectedMember=m;loadDay(dayData.date_str)" class="px-3 py-1 rounded-full text-xs border transition-colors" :class="selectedMember===m?(memberColor(m).bg+' '+memberColor(m).border+' '+memberColor(m).text):'border-hub-border text-hub-muted'" x-text="m"></button>
+            </template>
+          </div>
+          <!-- Agenda by person -->
+          <template x-for="[person, entries] in Object.entries(dayData.agenda).filter(([_,e])=>e.length>0)" :key="person">
+            <div class="mb-6">
+              <h2 class="text-sm font-semibold mb-2 flex items-center gap-2">
+                <span class="w-3 h-3 rounded border" :class="memberColor(person).bg+' '+memberColor(person).border"></span>
+                <span :class="memberColor(person).text" x-text="person"></span>
+              </h2>
+              <div class="space-y-2">
+                <template x-for="(entry,ei) in entries" :key="ei">
+                  <div class="bg-hub-card border border-hub-border rounded-lg p-3 flex items-start justify-between gap-3"
+                       :class="entry.Status==='done'||entry.Done?'opacity-50':''">
+                    <div class="flex-1 min-w-0">
+                      <div class="flex items-center gap-2 mb-1">
+                        <span class="text-xs text-hub-muted" x-text="entry.Time||entry['Start Time']||''"></span>
+                        <span class="text-xs px-1.5 py-0.5 rounded-full" :class="entry._type==='Tasks'?'bg-blue-500/20 text-blue-300':entry._type==='Study'?'bg-purple-500/20 text-purple-300':entry._type==='Reminders'?'bg-yellow-500/20 text-yellow-300':'bg-green-500/20 text-green-300'" x-text="entry._type"></span>
+                      </div>
+                      <div class="text-sm" :class="entry.Status==='done'||entry.Done?'line-through':''" x-text="entry.Title||entry.Subject||''"></div>
+                      <div x-show="entry.Description||entry.Topic" class="text-xs text-hub-muted mt-1" x-text="entry.Description||entry.Topic||''"></div>
+                    </div>
+                    <div class="flex items-center gap-1 shrink-0">
+                      <template x-if="entry._type==='Tasks'||entry._type==='Reminders'">
+                        <button @click="toggleDone(entry._type, entry._row_index, entry)" class="text-xs px-2 py-1 rounded border border-hub-border hover:border-hub-accent text-hub-muted hover:text-hub-accent" x-text="entry.Status==='done'||entry.Done?'Undo':'Done'"></button>
+                      </template>
+                      <button @click="goEdit(entry, entry._type, entry._row_index)" class="text-xs px-2 py-1 rounded border border-hub-border hover:border-blue-400 text-hub-muted hover:text-blue-400">Edit</button>
+                      <button @click="deleteEntry(entry._type, entry._row_index, person, ei)" class="text-xs px-2 py-1 rounded border border-hub-border hover:border-red-400 text-hub-muted hover:text-red-400">Del</button>
+                    </div>
+                  </div>
+                </template>
+              </div>
+            </div>
+          </template>
+          <div x-show="Object.values(dayData.agenda).every(e=>e.length===0)" class="bg-hub-card border border-hub-border rounded-lg p-8 text-center">
+            <p class="text-hub-muted">No entries for this day</p>
+          </div>
+        </div>
+      </template>
+    </div>
+
+    <!-- ADD ENTRY FORM -->
+    <div x-show="!loading && view==='add'" x-transition>
+      <div class="mb-2">
+        <a @click.prevent="goWeek()" href="#" class="text-hub-accent text-sm hover:underline">&larr; Back</a>
+      </div>
+      <h1 class="text-2xl font-bold mb-6">Add Entry</h1>
+      <div class="bg-hub-card border border-hub-border rounded-lg p-6 max-w-lg">
+        <!-- Sheet selector -->
+        <div class="mb-4">
+          <label class="block text-xs text-hub-muted mb-1">Sheet</label>
+          <select x-model="formSheet" class="w-full bg-hub-bg border border-hub-border rounded px-3 py-1.5 text-sm focus:outline-none focus:border-hub-accent">
+            <option value="Tasks">Tasks</option>
+            <option value="Study">Study</option>
+            <option value="Reminders">Reminders</option>
+            <option value="Events">Events</option>
+          </select>
+        </div>
+        <!-- Common fields -->
+        <div class="grid grid-cols-2 gap-3 mb-4">
+          <div>
+            <label class="block text-xs text-hub-muted mb-1">Date</label>
+            <input type="date" x-model="formData.date" class="w-full bg-hub-bg border border-hub-border rounded px-3 py-1.5 text-sm focus:outline-none focus:border-hub-accent">
+          </div>
+          <div>
+            <label class="block text-xs text-hub-muted mb-1">Time</label>
+            <input type="time" x-model="formData.time" class="w-full bg-hub-bg border border-hub-border rounded px-3 py-1.5 text-sm focus:outline-none focus:border-hub-accent">
+          </div>
+        </div>
+        <div class="mb-4" x-show="formSheet!=='Events'">
+          <label class="block text-xs text-hub-muted mb-1">Person</label>
+          <select x-model="formData.person" class="w-full bg-hub-bg border border-hub-border rounded px-3 py-1.5 text-sm focus:outline-none focus:border-hub-accent">
+            <option value="">Select...</option>
+            <template x-for="m in config?.family_members||[]" :key="m"><option :value="m" x-text="m"></option></template>
+          </select>
+        </div>
+        <!-- Tasks fields -->
+        <template x-if="formSheet==='Tasks'">
+          <div>
+            <div class="mb-3"><label class="block text-xs text-hub-muted mb-1">Title</label><input type="text" x-model="formData.title" class="w-full bg-hub-bg border border-hub-border rounded px-3 py-1.5 text-sm focus:outline-none focus:border-hub-accent"></div>
+            <div class="mb-3"><label class="block text-xs text-hub-muted mb-1">Description</label><input type="text" x-model="formData.description" class="w-full bg-hub-bg border border-hub-border rounded px-3 py-1.5 text-sm focus:outline-none focus:border-hub-accent"></div>
+            <div class="grid grid-cols-2 gap-3 mb-3">
+              <div><label class="block text-xs text-hub-muted mb-1">Status</label><select x-model="formData.status" class="w-full bg-hub-bg border border-hub-border rounded px-3 py-1.5 text-sm focus:outline-none focus:border-hub-accent"><option value="pending">Pending</option><option value="done">Done</option></select></div>
+              <div><label class="block text-xs text-hub-muted mb-1">Recurring</label><select x-model="formData.recurring" class="w-full bg-hub-bg border border-hub-border rounded px-3 py-1.5 text-sm focus:outline-none focus:border-hub-accent"><option value="">None</option><option value="daily">Daily</option><option value="weekly">Weekly</option><option value="monthly">Monthly</option></select></div>
+            </div>
+          </div>
+        </template>
+        <!-- Study fields -->
+        <template x-if="formSheet==='Study'">
+          <div>
+            <div class="mb-3"><label class="block text-xs text-hub-muted mb-1">Subject</label><input type="text" x-model="formData.subject" class="w-full bg-hub-bg border border-hub-border rounded px-3 py-1.5 text-sm focus:outline-none focus:border-hub-accent"></div>
+            <div class="mb-3"><label class="block text-xs text-hub-muted mb-1">Topic</label><input type="text" x-model="formData.topic" class="w-full bg-hub-bg border border-hub-border rounded px-3 py-1.5 text-sm focus:outline-none focus:border-hub-accent"></div>
+            <div class="grid grid-cols-2 gap-3 mb-3">
+              <div><label class="block text-xs text-hub-muted mb-1">Type</label><select x-model="formData.entry_type" class="w-full bg-hub-bg border border-hub-border rounded px-3 py-1.5 text-sm focus:outline-none focus:border-hub-accent"><option value="class">Class</option><option value="homework">Homework</option><option value="exam">Exam</option></select></div>
+              <div><label class="block text-xs text-hub-muted mb-1">Deadline</label><input type="date" x-model="formData.deadline" class="w-full bg-hub-bg border border-hub-border rounded px-3 py-1.5 text-sm focus:outline-none focus:border-hub-accent"></div>
+            </div>
+          </div>
+        </template>
+        <!-- Reminders fields -->
+        <template x-if="formSheet==='Reminders'">
+          <div>
+            <div class="mb-3"><label class="block text-xs text-hub-muted mb-1">Title</label><input type="text" x-model="formData.title" class="w-full bg-hub-bg border border-hub-border rounded px-3 py-1.5 text-sm focus:outline-none focus:border-hub-accent"></div>
+            <div class="mb-3"><label class="block text-xs text-hub-muted mb-1">Description</label><input type="text" x-model="formData.description" class="w-full bg-hub-bg border border-hub-border rounded px-3 py-1.5 text-sm focus:outline-none focus:border-hub-accent"></div>
+            <div class="mb-3"><label class="block text-xs text-hub-muted mb-1">Priority</label><select x-model="formData.priority" class="w-full bg-hub-bg border border-hub-border rounded px-3 py-1.5 text-sm focus:outline-none focus:border-hub-accent"><option value="low">Low</option><option value="medium">Medium</option><option value="high">High</option></select></div>
+          </div>
+        </template>
+        <!-- Events fields -->
+        <template x-if="formSheet==='Events'">
+          <div>
+            <div class="mb-3"><label class="block text-xs text-hub-muted mb-1">Title</label><input type="text" x-model="formData.title" class="w-full bg-hub-bg border border-hub-border rounded px-3 py-1.5 text-sm focus:outline-none focus:border-hub-accent"></div>
+            <div class="mb-3"><label class="block text-xs text-hub-muted mb-1">Description</label><input type="text" x-model="formData.description" class="w-full bg-hub-bg border border-hub-border rounded px-3 py-1.5 text-sm focus:outline-none focus:border-hub-accent"></div>
+            <div class="grid grid-cols-2 gap-3 mb-3">
+              <div><label class="block text-xs text-hub-muted mb-1">End Time</label><input type="time" x-model="formData.end_time" class="w-full bg-hub-bg border border-hub-border rounded px-3 py-1.5 text-sm focus:outline-none focus:border-hub-accent"></div>
+              <div><label class="block text-xs text-hub-muted mb-1">Participants</label><input type="text" x-model="formData.participants" class="w-full bg-hub-bg border border-hub-border rounded px-3 py-1.5 text-sm focus:outline-none focus:border-hub-accent"></div>
+            </div>
+          </div>
+        </template>
+        <button @click="submitEntry()" class="w-full bg-sky-500 hover:bg-sky-600 text-white py-2 rounded text-sm mt-2">Add Entry</button>
+      </div>
+    </div>
+
+    <!-- EDIT ENTRY FORM -->
+    <div x-show="!loading && view==='edit'" x-transition>
+      <div class="mb-2">
+        <a @click.prevent="goDay(formData.date||formData.Date)" href="#" class="text-hub-accent text-sm hover:underline">&larr; Back</a>
+      </div>
+      <h1 class="text-2xl font-bold mb-6">Edit Entry</h1>
+      <div class="bg-hub-card border border-hub-border rounded-lg p-6 max-w-lg">
+        <div class="grid grid-cols-2 gap-3 mb-4">
+          <div><label class="block text-xs text-hub-muted mb-1">Date</label><input type="date" x-model="formData.date" class="w-full bg-hub-bg border border-hub-border rounded px-3 py-1.5 text-sm focus:outline-none focus:border-hub-accent"></div>
+          <div><label class="block text-xs text-hub-muted mb-1">Time</label><input type="time" x-model="formData.time" class="w-full bg-hub-bg border border-hub-border rounded px-3 py-1.5 text-sm focus:outline-none focus:border-hub-accent"></div>
+        </div>
+        <div class="mb-4" x-show="editSheet!=='Events'">
+          <label class="block text-xs text-hub-muted mb-1">Person</label>
+          <select x-model="formData.person" class="w-full bg-hub-bg border border-hub-border rounded px-3 py-1.5 text-sm focus:outline-none focus:border-hub-accent">
+            <template x-for="m in config?.family_members||[]" :key="'ep-'+m"><option :value="m" x-text="m"></option></template>
+          </select>
+        </div>
+        <!-- Conditional fields same pattern as add form -->
+        <template x-if="editSheet==='Tasks'">
+          <div>
+            <div class="mb-3"><label class="block text-xs text-hub-muted mb-1">Title</label><input type="text" x-model="formData.title" class="w-full bg-hub-bg border border-hub-border rounded px-3 py-1.5 text-sm focus:outline-none focus:border-hub-accent"></div>
+            <div class="mb-3"><label class="block text-xs text-hub-muted mb-1">Description</label><input type="text" x-model="formData.description" class="w-full bg-hub-bg border border-hub-border rounded px-3 py-1.5 text-sm focus:outline-none focus:border-hub-accent"></div>
+          </div>
+        </template>
+        <template x-if="editSheet==='Study'">
+          <div>
+            <div class="mb-3"><label class="block text-xs text-hub-muted mb-1">Subject</label><input type="text" x-model="formData.subject" class="w-full bg-hub-bg border border-hub-border rounded px-3 py-1.5 text-sm focus:outline-none focus:border-hub-accent"></div>
+            <div class="mb-3"><label class="block text-xs text-hub-muted mb-1">Topic</label><input type="text" x-model="formData.topic" class="w-full bg-hub-bg border border-hub-border rounded px-3 py-1.5 text-sm focus:outline-none focus:border-hub-accent"></div>
+          </div>
+        </template>
+        <template x-if="editSheet==='Reminders'">
+          <div>
+            <div class="mb-3"><label class="block text-xs text-hub-muted mb-1">Title</label><input type="text" x-model="formData.title" class="w-full bg-hub-bg border border-hub-border rounded px-3 py-1.5 text-sm focus:outline-none focus:border-hub-accent"></div>
+            <div class="mb-3"><label class="block text-xs text-hub-muted mb-1">Description</label><input type="text" x-model="formData.description" class="w-full bg-hub-bg border border-hub-border rounded px-3 py-1.5 text-sm focus:outline-none focus:border-hub-accent"></div>
+          </div>
+        </template>
+        <template x-if="editSheet==='Events'">
+          <div>
+            <div class="mb-3"><label class="block text-xs text-hub-muted mb-1">Title</label><input type="text" x-model="formData.title" class="w-full bg-hub-bg border border-hub-border rounded px-3 py-1.5 text-sm focus:outline-none focus:border-hub-accent"></div>
+            <div class="mb-3"><label class="block text-xs text-hub-muted mb-1">Description</label><input type="text" x-model="formData.description" class="w-full bg-hub-bg border border-hub-border rounded px-3 py-1.5 text-sm focus:outline-none focus:border-hub-accent"></div>
+            <div class="mb-3"><label class="block text-xs text-hub-muted mb-1">End Time</label><input type="time" x-model="formData.end_time" class="w-full bg-hub-bg border border-hub-border rounded px-3 py-1.5 text-sm focus:outline-none focus:border-hub-accent"></div>
+          </div>
+        </template>
+        <button @click="saveEdit()" class="w-full bg-sky-500 hover:bg-sky-600 text-white py-2 rounded text-sm mt-2">Save</button>
+      </div>
+    </div>
+
+    <!-- TEMPLATES VIEW -->
+    <div x-show="!loading && view==='templates'" x-transition>
+      <div class="mb-2"><a @click.prevent="goWeek()" href="#" class="text-hub-accent text-sm hover:underline">&larr; Back to Week</a></div>
+      <h1 class="text-2xl font-bold mb-6">Templates</h1>
+      <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+        <template x-for="tpl in templatesData?.templates||[]" :key="tpl.id">
+          <div class="bg-hub-card border border-hub-border rounded-lg p-5">
+            <h3 class="text-lg font-semibold mb-1" x-text="tpl.name"></h3>
+            <p class="text-sm text-hub-muted mb-3" x-text="tpl.description"></p>
+            <p class="text-xs text-hub-muted mb-4" x-text="tpl.entry_count+' entries'"></p>
+            <div class="grid grid-cols-2 gap-2 mb-3" x-data="{tplPerson:'',tplDate:''}">
+              <div>
+                <label class="block text-xs text-hub-muted mb-1">Person</label>
+                <select x-model="tplPerson" class="w-full px-2 py-1.5 text-sm bg-hub-bg border border-hub-border rounded focus:outline-none focus:border-hub-accent">
+                  <template x-for="m in config?.family_members||[]" :key="'tp-'+tpl.id+m"><option :value="m" x-text="m"></option></template>
+                </select>
+              </div>
+              <div>
+                <label class="block text-xs text-hub-muted mb-1">Start (Mon)</label>
+                <input type="date" x-model="tplDate" class="w-full px-2 py-1.5 text-sm bg-hub-bg border border-hub-border rounded focus:outline-none focus:border-hub-accent">
+              </div>
+              <button @click="applyTemplate(tpl.id, tplPerson, tplDate)" class="col-span-2 bg-sky-500 hover:bg-sky-600 text-white py-1.5 rounded text-sm">Apply Template</button>
+            </div>
+          </div>
+        </template>
+      </div>
+    </div>
+
+    <!-- ACTIVITY VIEW -->
+    <div x-show="!loading && view==='activity'" x-transition>
+      <div class="mb-2"><a @click.prevent="goWeek()" href="#" class="text-hub-accent text-sm hover:underline">&larr; Back to Week</a></div>
+      <h1 class="text-2xl font-bold mb-6">Activity Log</h1>
+      <template x-if="activityData?.log?.length">
+        <div class="bg-hub-card border border-hub-border rounded-lg overflow-hidden">
+          <div class="overflow-x-auto">
+            <table class="w-full text-sm">
+              <thead><tr class="border-b border-hub-border text-hub-muted text-xs"><th class="px-4 py-2 text-left">Time</th><th class="px-4 py-2 text-left">Action</th><th class="px-4 py-2 text-left">Type</th><th class="px-4 py-2 text-left">Details</th></tr></thead>
+              <tbody>
+                <template x-for="(entry,i) in activityData.log" :key="i">
+                  <tr class="border-b border-hub-border/50 hover:bg-hub-bg/50">
+                    <td class="px-4 py-2 text-hub-muted text-xs whitespace-nowrap" x-text="entry.timestamp?.slice(0,16)"></td>
+                    <td class="px-4 py-2">
+                      <span class="text-xs px-1.5 py-0.5 rounded-full" :class="entry.action==='add'?'bg-green-500/20 text-green-300':entry.action==='edit'?'bg-blue-500/20 text-blue-300':'bg-red-500/20 text-red-300'" x-text="entry.action"></span>
+                    </td>
+                    <td class="px-4 py-2 text-hub-muted" x-text="entry.sheet"></td>
+                    <td class="px-4 py-2 text-xs" x-text="entry.data?Object.entries(entry.data).filter(([k,v])=>v&&k!=='_type').map(([k,v])=>k+': '+v).join(', '):''"></td>
+                  </tr>
+                </template>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </template>
+      <div x-show="!activityData?.log?.length" class="bg-hub-card border border-hub-border rounded-lg p-8 text-center">
+        <p class="text-hub-muted">No activity recorded yet</p>
+      </div>
+    </div>
+
+    <!-- COLORS VIEW -->
+    <div x-show="!loading && view==='colors'" x-transition>
+      <div class="mb-2"><a @click.prevent="goWeek()" href="#" class="text-hub-accent text-sm hover:underline">&larr; Back to Week</a></div>
+      <h1 class="text-2xl font-bold mb-2">Color Settings</h1>
+      <p class="text-hub-muted text-sm mb-6">Set via env: <code class="bg-hub-bg px-1 py-0.5 rounded text-xs">MEMBER_COLORS=Duc:blue,Wife:pink,...</code></p>
+      <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+        <template x-for="m in config?.family_members||[]" :key="'cm-'+m">
+          <div class="bg-hub-card border border-hub-border rounded-lg p-4">
+            <h3 class="text-sm font-semibold mb-3" x-text="m"></h3>
+            <div class="flex flex-wrap gap-2">
+              <template x-for="(color, name) in colorsData?.color_presets||{}" :key="name">
+                <div class="flex items-center gap-1.5 px-2 py-1 rounded border" :class="colorsData?.current_colors?.[m]===name ? color.border+' '+color.bg : 'border-hub-border'">
+                  <span class="w-4 h-4 rounded-full border" :class="color.bg+' '+color.border"></span>
+                  <span class="text-xs" :class="colorsData?.current_colors?.[m]===name ? color.text : 'text-hub-muted'" x-text="name"></span>
+                </div>
+              </template>
+            </div>
+          </div>
+        </template>
+      </div>
+    </div>
+
+  </main>
+
+<script>
+function app() {
+  return {
+    view: 'week',
+    config: null,
+    loading: true,
+    selectedMember: '',
+    weekData: null,
+    monthData: null,
+    dayData: null,
+    activityData: null,
+    templatesData: null,
+    colorsData: null,
+    formSheet: 'Tasks',
+    formData: {},
+    editSheet: '',
+    editRow: -1,
+    monthYear: new Date().getFullYear(),
+    monthMonth: new Date().getMonth() + 1,
+
+    async init() {
+      const r = await fetch('/api/config');
+      this.config = await r.json();
+      await this.loadWeek();
+      this.loading = false;
+    },
+
+    memberColor(person) {
+      return this.config?.colors?.[person] || {bg:'bg-gray-500/20', border:'border-gray-400', text:'text-gray-400', hex:'#9ca3af'};
+    },
+    t(key) { return this.config?.translations?.[key] || key; },
+
+    async loadWeek(start) {
+      const params = new URLSearchParams();
+      if (start) params.set('start', start);
+      if (this.selectedMember) params.set('member', this.selectedMember);
+      const r = await fetch('/api/week?' + params);
+      this.weekData = await r.json();
+    },
+    async loadMonth(year, month) {
+      this.monthYear = year; this.monthMonth = month;
+      const params = this.selectedMember ? '?member=' + this.selectedMember : '';
+      const r = await fetch(`/api/month/${year}/${month}${params}`);
+      this.monthData = await r.json();
+    },
+    async loadDay(dateStr) {
+      const params = this.selectedMember ? '?member=' + this.selectedMember : '';
+      const r = await fetch(`/api/day/${dateStr}${params}`);
+      this.dayData = await r.json();
+    },
+    async loadActivity() {
+      const r = await fetch('/api/activity');
+      this.activityData = await r.json();
+    },
+    async loadTemplates() {
+      const r = await fetch('/api/templates');
+      this.templatesData = await r.json();
+    },
+    async loadColors() {
+      const r = await fetch('/api/colors');
+      this.colorsData = await r.json();
+    },
+
+    goWeek(start) { this.view = 'week'; this.loadWeek(start); },
+    goMonth(y, m) { this.view = 'month'; this.loadMonth(y, m); },
+    goDay(d) { this.view = 'day'; this.loadDay(d); },
+    goAdd(dateStr, sheet) {
+      this.view = 'add';
+      this.formSheet = sheet || 'Tasks';
+      this.formData = { date: dateStr || new Date().toISOString().slice(0, 10), time: '', person: '', title: '', description: '', subject: '', topic: '', entry_type: 'class', deadline: '', priority: 'medium', end_time: '', participants: '', status: 'pending', recurring: '' };
+    },
+    goEdit(entry, sheet, row) {
+      this.view = 'edit';
+      this.editSheet = sheet;
+      this.editRow = row;
+      this.formData = {
+        date: entry.Date || '', time: entry.Time || entry['Start Time'] || '',
+        person: entry.Person || '', title: entry.Title || '', description: entry.Description || '',
+        subject: entry.Subject || '', topic: entry.Topic || '', entry_type: entry.Type || '',
+        deadline: entry.Deadline || '', priority: entry.Priority || '', end_time: entry['End Time'] || '',
+        participants: entry.Participants || '', status: entry.Status || 'pending', recurring: entry.Recurring || '', done: entry.Done || ''
+      };
+    },
+
+    async submitEntry() {
+      const body = { sheet: this.formSheet, ...this.formData };
+      await fetch('/api/entries', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
+      this.goDay(this.formData.date);
+    },
+    async saveEdit() {
+      await fetch(`/api/entries/${this.editSheet}/${this.editRow}`, { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(this.formData) });
+      this.goDay(this.formData.date);
+    },
+    async deleteEntry(sheet, row, person, entryIdx) {
+      if (!confirm('Delete this entry?')) return;
+      await fetch(`/api/entries/${sheet}/${row}`, { method: 'DELETE' });
+      if (this.dayData?.agenda?.[person]) {
+        this.dayData.agenda[person].splice(entryIdx, 1);
+      }
+    },
+    async toggleDone(sheet, row, entry) {
+      const r = await fetch(`/api/toggle/${sheet}/${row}`, { method: 'POST' });
+      const data = await r.json();
+      if (data.ok) {
+        if (sheet === 'Tasks') entry.Status = data.new_status;
+        else if (sheet === 'Reminders') entry.Done = data.new_status;
+      }
+    },
+    async applyTemplate(templateId, person, startDate) {
+      if (!person || !startDate) { alert('Please select person and date'); return; }
+      const r = await fetch('/api/templates/apply', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ template_id: templateId, person, start_date: startDate }) });
+      const data = await r.json();
+      if (data.ok) { alert(`Applied ${data.count} entries`); this.goWeek(startDate); }
+    },
+  };
+}
+</script>
+</body>
+</html>

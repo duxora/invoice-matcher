@@ -1,0 +1,148 @@
+{% extends "base.html" %}
+{% block title %}{{ date_label }} - {{ t("family_timetable") }}{% endblock %}
+
+{% block content %}
+<div class="mb-2">
+  <a href="/" class="text-hub-accent text-sm hover:underline">&larr; {{ t("back_to_week") }}</a>
+</div>
+
+<div class="mb-6 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
+  <div>
+    <h1 class="text-2xl font-bold">{{ date_label }}</h1>
+  </div>
+  <div class="flex flex-wrap gap-2">
+    <a href="/add?date_str={{ date_str }}" class="btn btn-primary text-sm">+ {{ t("add_entry") }}</a>
+    <a href="/export.ics?weeks=1{% if selected_member %}&member={{ selected_member }}{% endif %}" class="btn btn-ghost text-sm">{{ t("export_ical") }}</a>
+  </div>
+</div>
+
+{# Member filter #}
+<div class="flex flex-wrap gap-2 mb-4">
+  <a href="/day/{{ date_str }}"
+     class="px-3 py-1 rounded-full text-xs border transition-colors
+            {% if not selected_member %}bg-hub-accent/20 border-hub-accent text-hub-accent{% else %}border-hub-border text-hub-muted hover:text-hub-text{% endif %}">
+    {{ t("filter_all") }}
+  </a>
+  {% for member in family_members %}
+  {% set color = get_member_color(member) %}
+  <a href="/day/{{ date_str }}?member={{ member }}"
+     class="px-3 py-1 rounded-full text-xs border transition-colors
+            {% if selected_member == member %}{{ color.bg }} {{ color.border }} {{ color.text }}{% else %}border-hub-border text-hub-muted hover:text-hub-text{% endif %}">
+    {{ member }}
+  </a>
+  {% endfor %}
+</div>
+
+{# Conflict warning #}
+{% if conflicts %}
+<div class="bg-orange-500/10 border border-orange-500/30 rounded-lg p-3 mb-4">
+  <span class="text-orange-400 text-sm font-medium">{{ t("conflict_warning") }}</span>
+  {% for c1, c2 in conflicts %}
+  <div class="text-xs text-hub-muted mt-1">
+    {{ c1.get("Person", "") }} @ {{ c1.get("Time", c1.get("Start Time", "")) }}:
+    <span class="text-orange-300">{{ c1.get("Title", c1.get("Subject", "")) }}</span> &amp;
+    <span class="text-orange-300">{{ c2.get("Title", c2.get("Subject", "")) }}</span>
+  </div>
+  {% endfor %}
+</div>
+{% endif %}
+
+<div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+  {% for person, entries in agenda.items() %}
+  {% set color = get_member_color(person) %}
+  <div class="bg-hub-card border border-hub-border rounded-lg p-4">
+    <h2 class="text-lg font-semibold mb-3 {{ color.text }}">{{ person }}</h2>
+    {% if entries %}
+    <div class="space-y-2">
+      {% for entry in entries %}
+      {% set is_done = entry.get("Status") == "done" or entry.get("Done") %}
+      <div class="{{ color.bg }} rounded p-2 {% if is_done %}opacity-50{% endif %}">
+        <div class="flex items-center justify-between">
+          <span class="text-xs text-hub-muted">{{ entry.get("Time", entry.get("Start Time", "")) }}</span>
+          <div class="flex items-center gap-1">
+            <span class="text-[10px] px-1.5 py-0.5 rounded-full
+                {% if entry.get('_type') == 'Tasks' %}bg-blue-500/20 text-blue-300
+                {% elif entry.get('_type') == 'Study' %}bg-green-500/20 text-green-300
+                {% elif entry.get('_type') == 'Reminders' %}bg-yellow-500/20 text-yellow-300
+                {% elif entry.get('_type') == 'Events' %}bg-purple-500/20 text-purple-300
+                {% endif %}">{{ entry.get("_type", "") }}</span>
+          </div>
+        </div>
+        <div class="text-sm font-medium mt-1 {% if is_done %}line-through{% endif %}">
+          {{ entry.get("Title", entry.get("Subject", "")) }}
+        </div>
+        {% if entry.get("Description") or entry.get("Topic") %}
+        <div class="text-xs text-hub-muted mt-1">{{ entry.get("Description", entry.get("Topic", "")) }}</div>
+        {% endif %}
+
+        {# Deadline countdown #}
+        {% if entry.get("_deadline_info") %}
+        {% set dl = entry._deadline_info %}
+        {% if dl.status == "overdue" %}
+        <div class="text-xs text-red-400 mt-1 font-medium">{{ t("overdue") }} ({{ dl.days }} {{ t("days") }})</div>
+        {% elif dl.status == "due_today" %}
+        <div class="text-xs text-yellow-400 mt-1 font-medium">{{ t("due_today") }}</div>
+        {% elif dl.status == "upcoming" and dl.days <= 3 %}
+        <div class="text-xs text-yellow-300 mt-1">{{ t("due_in") }} {{ dl.days }} {{ t("days") }}</div>
+        {% elif dl.status == "upcoming" %}
+        <div class="text-xs text-hub-muted mt-1">{{ t("deadline") }}: {{ entry.get("Deadline") }}</div>
+        {% endif %}
+        {% elif entry.get("Deadline") %}
+        <div class="text-xs text-hub-muted mt-1">{{ t("deadline") }}: {{ entry.Deadline }}</div>
+        {% endif %}
+
+        {# Priority badge for reminders #}
+        {% if entry.get("Priority") %}
+        <span class="text-[10px] px-1.5 py-0.5 rounded-full mt-1 inline-block
+              {% if entry.Priority == 'high' %}bg-red-500/20 text-red-300
+              {% elif entry.Priority == 'medium' %}bg-yellow-500/20 text-yellow-300
+              {% else %}bg-gray-500/20 text-gray-300{% endif %}">
+          {{ entry.Priority }}
+        </span>
+        {% endif %}
+
+        {# Action buttons #}
+        {% if entry.get("_row_index") is not none %}
+        <div class="flex items-center gap-2 mt-2 pt-2 border-t border-white/10">
+          {# Toggle complete #}
+          {% if entry.get("_type") == "Tasks" %}
+          <form method="post" action="/toggle/Tasks/{{ entry._row_index }}" class="inline">
+            <button type="submit" class="text-[10px] px-2 py-0.5 rounded border transition-colors
+                    {% if is_done %}border-green-500/30 text-green-400 hover:bg-green-500/20{% else %}border-hub-border text-hub-muted hover:text-hub-text{% endif %}">
+              {% if is_done %}{{ t("completed") }}{% else %}{{ t("mark_done") }}{% endif %}
+            </button>
+          </form>
+          {% elif entry.get("_type") == "Reminders" %}
+          <form method="post" action="/toggle/Reminders/{{ entry._row_index }}" class="inline">
+            <button type="submit" class="text-[10px] px-2 py-0.5 rounded border transition-colors
+                    {% if is_done %}border-green-500/30 text-green-400 hover:bg-green-500/20{% else %}border-hub-border text-hub-muted hover:text-hub-text{% endif %}">
+              {% if is_done %}{{ t("done") }}{% else %}{{ t("mark_done") }}{% endif %}
+            </button>
+          </form>
+          {% endif %}
+
+          {# Edit #}
+          <a href="/edit/{{ entry._type }}/{{ entry._row_index }}"
+             class="text-[10px] px-2 py-0.5 rounded border border-hub-border text-hub-muted hover:text-hub-text transition-colors">
+            {{ t("edit") }}
+          </a>
+
+          {# Delete #}
+          <form method="post" action="/delete/{{ entry._type }}/{{ entry._row_index }}" class="inline"
+                onsubmit="return confirm('{{ t("confirm_delete") }}')">
+            <button type="submit" class="text-[10px] px-2 py-0.5 rounded border border-red-500/30 text-red-400 hover:bg-red-500/20 transition-colors">
+              {{ t("delete") }}
+            </button>
+          </form>
+        </div>
+        {% endif %}
+      </div>
+      {% endfor %}
+    </div>
+    {% else %}
+    <p class="text-sm text-hub-muted italic">{{ t("no_entries") }}</p>
+    {% endif %}
+  </div>
+  {% endfor %}
+</div>
+{% endblock %}

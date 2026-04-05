@@ -1,0 +1,18 @@
+# name: Log Summarizer
+# schedule: every 6h
+# workdir: ~/workspace/myproject
+# model: claude-haiku-4-5-20251001
+# tools: Read,Grep,Glob,Bash
+# max_turns: 5
+# timeout: 120
+# retry: 0
+# notify: errors
+# on_failure: notify
+# enabled: false
+---
+Summarize recent application logs.
+
+1. Read the last 500 lines of log files in ./logs/
+2. Identify: errors, warnings, unusual patterns
+3. Group by category and frequency
+4. Output a brief summary (max 20 lines)

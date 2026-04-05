@@ -1,0 +1,10 @@
+{% extends "base.html" %}
+{% block title %}{{ code }} — Error{% endblock %}
+{% block content %}
+<div class="text-center py-16">
+    <div class="text-6xl font-bold text-hub-muted mb-4">{{ code }}</div>
+    <div class="text-xl mb-2">{{ title }}</div>
+    <div class="text-hub-muted mb-6">{{ message }}</div>
+    <a href="/" class="btn btn-primary">Back to Home</a>
+</div>
+{% endblock %}

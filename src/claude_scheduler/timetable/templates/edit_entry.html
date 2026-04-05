@@ -1,0 +1,171 @@
+{% extends "base.html" %}
+{% block title %}{{ t("edit_entry") }} - {{ t("family_timetable") }}{% endblock %}
+
+{% block content %}
+<div class="mb-2">
+  <a href="/day/{{ entry.get('Date', '') }}" class="text-hub-accent text-sm hover:underline">&larr; {{ t("back") }}</a>
+</div>
+
+<div class="mb-6">
+  <h1 class="text-2xl font-bold">{{ t("edit_entry") }}</h1>
+</div>
+
+<div class="bg-hub-card border border-hub-border rounded-lg p-6 max-w-2xl">
+  <form method="post" action="/edit/{{ sheet }}/{{ row_index }}" class="space-y-4">
+    <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+      <div>
+        <label class="block text-sm font-medium mb-1">{{ t("type") }}</label>
+        <input type="text" value="{{ sheet }}" disabled
+               class="w-full px-3 py-2 text-sm bg-hub-bg border border-hub-border rounded opacity-60">
+      </div>
+      <div>
+        <label for="person" class="block text-sm font-medium mb-1">{{ t("person") }}</label>
+        <select id="person" name="person"
+                class="w-full px-3 py-2 text-sm bg-hub-bg border border-hub-border rounded focus:outline-none focus:border-hub-accent">
+          {% for m in family_members %}
+          <option value="{{ m }}" {% if entry.get("Person", entry.get("Participants", "")) == m %}selected{% endif %}>{{ m }}</option>
+          {% endfor %}
+          <option value="Family" {% if entry.get("Person", entry.get("Participants", "")) == "Family" %}selected{% endif %}>{{ t("family_shared") }}</option>
+        </select>
+      </div>
+    </div>
+
+    <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+      <div>
+        <label for="date" class="block text-sm font-medium mb-1">{{ t("date") }} *</label>
+        <input type="date" id="date" name="date" value="{{ entry.get('Date', '') }}" required
+               class="w-full px-3 py-2 text-sm bg-hub-bg border border-hub-border rounded focus:outline-none focus:border-hub-accent">
+      </div>
+      <div>
+        <label for="time" class="block text-sm font-medium mb-1">{{ t("time") }}</label>
+        <input type="time" id="time" name="time" value="{{ entry.get('Time', entry.get('Start Time', '')) }}"
+               class="w-full px-3 py-2 text-sm bg-hub-bg border border-hub-border rounded focus:outline-none focus:border-hub-accent">
+      </div>
+    </div>
+
+    {% if sheet == "Tasks" %}
+    <div>
+      <label for="title" class="block text-sm font-medium mb-1">{{ t("title") }} *</label>
+      <input type="text" id="title" name="title" value="{{ entry.get('Title', '') }}"
+             class="w-full px-3 py-2 text-sm bg-hub-bg border border-hub-border rounded focus:outline-none focus:border-hub-accent">
+    </div>
+    <div>
+      <label for="description" class="block text-sm font-medium mb-1">{{ t("description") }}</label>
+      <textarea id="description" name="description" rows="2"
+                class="w-full px-3 py-2 text-sm bg-hub-bg border border-hub-border rounded focus:outline-none focus:border-hub-accent">{{ entry.get('Description', '') }}</textarea>
+    </div>
+    <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+      <div>
+        <label for="status" class="block text-sm font-medium mb-1">{{ t("status") }}</label>
+        <select id="status" name="status"
+                class="w-full px-3 py-2 text-sm bg-hub-bg border border-hub-border rounded focus:outline-none focus:border-hub-accent">
+          <option value="pending" {% if entry.get("Status") == "pending" %}selected{% endif %}>{{ t("pending") }}</option>
+          <option value="in_progress" {% if entry.get("Status") == "in_progress" %}selected{% endif %}>{{ t("in_progress") }}</option>
+          <option value="done" {% if entry.get("Status") == "done" %}selected{% endif %}>{{ t("done") }}</option>
+        </select>
+      </div>
+      <div>
+        <label for="recurring" class="block text-sm font-medium mb-1">{{ t("recurring") }}</label>
+        <select id="recurring" name="recurring"
+                class="w-full px-3 py-2 text-sm bg-hub-bg border border-hub-border rounded focus:outline-none focus:border-hub-accent">
+          <option value="" {% if not entry.get("Recurring") %}selected{% endif %}>{{ t("none") }}</option>
+          <option value="daily" {% if entry.get("Recurring") == "daily" %}selected{% endif %}>{{ t("daily") }}</option>
+          <option value="weekly" {% if entry.get("Recurring") == "weekly" %}selected{% endif %}>{{ t("weekly") }}</option>
+          <option value="monthly" {% if entry.get("Recurring") == "monthly" %}selected{% endif %}>{{ t("monthly") }}</option>
+        </select>
+      </div>
+    </div>
+
+    {% elif sheet == "Study" %}
+    <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+      <div>
+        <label for="subject" class="block text-sm font-medium mb-1">{{ t("subject") }}</label>
+        <input type="text" id="subject" name="subject" value="{{ entry.get('Subject', '') }}"
+               class="w-full px-3 py-2 text-sm bg-hub-bg border border-hub-border rounded focus:outline-none focus:border-hub-accent">
+      </div>
+      <div>
+        <label for="topic" class="block text-sm font-medium mb-1">{{ t("topic") }}</label>
+        <input type="text" id="topic" name="topic" value="{{ entry.get('Topic', '') }}"
+               class="w-full px-3 py-2 text-sm bg-hub-bg border border-hub-border rounded focus:outline-none focus:border-hub-accent">
+      </div>
+    </div>
+    <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+      <div>
+        <label for="entry_type" class="block text-sm font-medium mb-1">{{ t("entry_type") }}</label>
+        <select id="entry_type" name="entry_type"
+                class="w-full px-3 py-2 text-sm bg-hub-bg border border-hub-border rounded focus:outline-none focus:border-hub-accent">
+          <option value="class" {% if entry.get("Type") == "class" %}selected{% endif %}>{{ t("class") }}</option>
+          <option value="homework" {% if entry.get("Type") == "homework" %}selected{% endif %}>{{ t("homework") }}</option>
+          <option value="exam" {% if entry.get("Type") == "exam" %}selected{% endif %}>{{ t("exam") }}</option>
+        </select>
+      </div>
+      <div>
+        <label for="deadline" class="block text-sm font-medium mb-1">{{ t("deadline") }}</label>
+        <input type="date" id="deadline" name="deadline" value="{{ entry.get('Deadline', '') }}"
+               class="w-full px-3 py-2 text-sm bg-hub-bg border border-hub-border rounded focus:outline-none focus:border-hub-accent">
+      </div>
+    </div>
+
+    {% elif sheet == "Reminders" %}
+    <div>
+      <label for="title" class="block text-sm font-medium mb-1">{{ t("title") }} *</label>
+      <input type="text" id="title" name="title" value="{{ entry.get('Title', '') }}"
+             class="w-full px-3 py-2 text-sm bg-hub-bg border border-hub-border rounded focus:outline-none focus:border-hub-accent">
+    </div>
+    <div>
+      <label for="description" class="block text-sm font-medium mb-1">{{ t("description") }}</label>
+      <textarea id="description" name="description" rows="2"
+                class="w-full px-3 py-2 text-sm bg-hub-bg border border-hub-border rounded focus:outline-none focus:border-hub-accent">{{ entry.get('Description', '') }}</textarea>
+    </div>
+    <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+      <div>
+        <label for="priority" class="block text-sm font-medium mb-1">{{ t("priority") }}</label>
+        <select id="priority" name="priority"
+                class="w-full px-3 py-2 text-sm bg-hub-bg border border-hub-border rounded focus:outline-none focus:border-hub-accent">
+          <option value="low" {% if entry.get("Priority") == "low" %}selected{% endif %}>{{ t("low") }}</option>
+          <option value="medium" {% if entry.get("Priority") == "medium" %}selected{% endif %}>{{ t("medium") }}</option>
+          <option value="high" {% if entry.get("Priority") == "high" %}selected{% endif %}>{{ t("high") }}</option>
+        </select>
+      </div>
+      <div>
+        <label for="done" class="block text-sm font-medium mb-1">{{ t("done") }}</label>
+        <select id="done" name="done"
+                class="w-full px-3 py-2 text-sm bg-hub-bg border border-hub-border rounded focus:outline-none focus:border-hub-accent">
+          <option value="" {% if not entry.get("Done") %}selected{% endif %}>{{ t("pending") }}</option>
+          <option value="yes" {% if entry.get("Done") %}selected{% endif %}>{{ t("done") }}</option>
+        </select>
+      </div>
+    </div>
+
+    {% elif sheet == "Events" %}
+    <div>
+      <label for="title" class="block text-sm font-medium mb-1">{{ t("title") }} *</label>
+      <input type="text" id="title" name="title" value="{{ entry.get('Title', '') }}"
+             class="w-full px-3 py-2 text-sm bg-hub-bg border border-hub-border rounded focus:outline-none focus:border-hub-accent">
+    </div>
+    <div>
+      <label for="description" class="block text-sm font-medium mb-1">{{ t("description") }}</label>
+      <textarea id="description" name="description" rows="2"
+                class="w-full px-3 py-2 text-sm bg-hub-bg border border-hub-border rounded focus:outline-none focus:border-hub-accent">{{ entry.get('Description', '') }}</textarea>
+    </div>
+    <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+      <div>
+        <label for="end_time" class="block text-sm font-medium mb-1">{{ t("end_time") }}</label>
+        <input type="time" id="end_time" name="end_time" value="{{ entry.get('End Time', '') }}"
+               class="w-full px-3 py-2 text-sm bg-hub-bg border border-hub-border rounded focus:outline-none focus:border-hub-accent">
+      </div>
+      <div>
+        <label for="participants" class="block text-sm font-medium mb-1">{{ t("participants") }}</label>
+        <input type="text" id="participants" name="participants" value="{{ entry.get('Participants', '') }}"
+               class="w-full px-3 py-2 text-sm bg-hub-bg border border-hub-border rounded focus:outline-none focus:border-hub-accent">
+      </div>
+    </div>
+    {% endif %}
+
+    <div class="flex items-center gap-3 pt-2">
+      <button type="submit" class="btn btn-primary px-6 py-2">{{ t("save") }}</button>
+      <a href="/day/{{ entry.get('Date', '') }}" class="btn btn-ghost">{{ t("cancel") }}</a>
+    </div>
+  </form>
+</div>
+{% endblock %}

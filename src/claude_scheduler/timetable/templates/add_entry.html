@@ -1,0 +1,145 @@
+{% extends "base.html" %}
+{% block title %}{{ t("add_entry") }} - {{ t("family_timetable") }}{% endblock %}
+
+{% block content %}
+<div class="mb-2">
+  <a href="/" class="text-hub-accent text-sm hover:underline">&larr; {{ t("back") }}</a>
+</div>
+
+<div class="mb-6">
+  <h1 class="text-2xl font-bold">{{ t("add_entry") }}</h1>
+</div>
+
+<div class="bg-hub-card border border-hub-border rounded-lg p-6 max-w-2xl">
+  <form method="post" action="/add" class="space-y-4" id="add-form">
+    <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+      <div>
+        <label for="sheet" class="block text-sm font-medium mb-1">{{ t("type") }} *</label>
+        <select id="sheet" name="sheet" onchange="toggleFields()"
+                class="w-full px-3 py-2 text-sm bg-hub-bg border border-hub-border rounded focus:outline-none focus:border-hub-accent">
+          {% for s in sheets %}
+          <option value="{{ s }}" {% if s == sheet %}selected{% endif %}>{{ t(s|lower) }}</option>
+          {% endfor %}
+        </select>
+      </div>
+      <div>
+        <label for="person" class="block text-sm font-medium mb-1">{{ t("person") }} *</label>
+        <select id="person" name="person"
+                class="w-full px-3 py-2 text-sm bg-hub-bg border border-hub-border rounded focus:outline-none focus:border-hub-accent">
+          {% for m in family_members %}
+          <option value="{{ m }}">{{ m }}</option>
+          {% endfor %}
+          <option value="Family">{{ t("family_shared") }}</option>
+        </select>
+      </div>
+    </div>
+
+    <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+      <div>
+        <label for="date" class="block text-sm font-medium mb-1">{{ t("date") }} *</label>
+        <input type="date" id="date" name="date" value="{{ date_str }}" required
+               class="w-full px-3 py-2 text-sm bg-hub-bg border border-hub-border rounded focus:outline-none focus:border-hub-accent">
+      </div>
+      <div>
+        <label for="time" class="block text-sm font-medium mb-1">{{ t("time") }}</label>
+        <input type="time" id="time" name="time"
+               class="w-full px-3 py-2 text-sm bg-hub-bg border border-hub-border rounded focus:outline-none focus:border-hub-accent">
+      </div>
+    </div>
+
+    <div id="field-title">
+      <label for="title" class="block text-sm font-medium mb-1">{{ t("title") }} *</label>
+      <input type="text" id="title" name="title"
+             class="w-full px-3 py-2 text-sm bg-hub-bg border border-hub-border rounded focus:outline-none focus:border-hub-accent">
+    </div>
+
+    <div id="field-description">
+      <label for="description" class="block text-sm font-medium mb-1">{{ t("description") }}</label>
+      <textarea id="description" name="description" rows="2"
+                class="w-full px-3 py-2 text-sm bg-hub-bg border border-hub-border rounded focus:outline-none focus:border-hub-accent"></textarea>
+    </div>
+
+    <div id="field-study" class="hidden space-y-4">
+      <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+        <div>
+          <label for="subject" class="block text-sm font-medium mb-1">{{ t("subject") }}</label>
+          <input type="text" id="subject" name="subject"
+                 class="w-full px-3 py-2 text-sm bg-hub-bg border border-hub-border rounded focus:outline-none focus:border-hub-accent">
+        </div>
+        <div>
+          <label for="topic" class="block text-sm font-medium mb-1">{{ t("topic") }}</label>
+          <input type="text" id="topic" name="topic"
+                 class="w-full px-3 py-2 text-sm bg-hub-bg border border-hub-border rounded focus:outline-none focus:border-hub-accent">
+        </div>
+      </div>
+      <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+        <div>
+          <label for="entry_type" class="block text-sm font-medium mb-1">{{ t("entry_type") }}</label>
+          <select id="entry_type" name="entry_type"
+                  class="w-full px-3 py-2 text-sm bg-hub-bg border border-hub-border rounded focus:outline-none focus:border-hub-accent">
+            <option value="class">{{ t("class") }}</option>
+            <option value="homework">{{ t("homework") }}</option>
+            <option value="exam">{{ t("exam") }}</option>
+          </select>
+        </div>
+        <div>
+          <label for="deadline" class="block text-sm font-medium mb-1">{{ t("deadline") }}</label>
+          <input type="date" id="deadline" name="deadline"
+                 class="w-full px-3 py-2 text-sm bg-hub-bg border border-hub-border rounded focus:outline-none focus:border-hub-accent">
+        </div>
+      </div>
+    </div>
+
+    <div id="field-reminder" class="hidden">
+      <label for="priority" class="block text-sm font-medium mb-1">{{ t("priority") }}</label>
+      <select id="priority" name="priority"
+              class="w-full px-3 py-2 text-sm bg-hub-bg border border-hub-border rounded focus:outline-none focus:border-hub-accent">
+        <option value="low">{{ t("low") }}</option>
+        <option value="medium" selected>{{ t("medium") }}</option>
+        <option value="high">{{ t("high") }}</option>
+      </select>
+    </div>
+
+    <div id="field-event" class="hidden space-y-4">
+      <div>
+        <label for="end_time" class="block text-sm font-medium mb-1">{{ t("end_time") }}</label>
+        <input type="time" id="end_time" name="end_time"
+               class="w-full px-3 py-2 text-sm bg-hub-bg border border-hub-border rounded focus:outline-none focus:border-hub-accent">
+      </div>
+      <div>
+        <label for="participants" class="block text-sm font-medium mb-1">{{ t("participants") }}</label>
+        <input type="text" id="participants" name="participants" placeholder="e.g. Family"
+               class="w-full px-3 py-2 text-sm bg-hub-bg border border-hub-border rounded focus:outline-none focus:border-hub-accent">
+      </div>
+    </div>
+
+    <div id="field-tasks" class="hidden">
+      <label for="recurring" class="block text-sm font-medium mb-1">{{ t("recurring") }}</label>
+      <select id="recurring" name="recurring"
+              class="w-full px-3 py-2 text-sm bg-hub-bg border border-hub-border rounded focus:outline-none focus:border-hub-accent">
+        <option value="">{{ t("none") }}</option>
+        <option value="daily">{{ t("daily") }}</option>
+        <option value="weekly">{{ t("weekly") }}</option>
+        <option value="monthly">{{ t("monthly") }}</option>
+      </select>
+    </div>
+
+    <div class="flex items-center gap-3 pt-2">
+      <button type="submit" class="btn btn-primary px-6 py-2">{{ t("add_entry") }}</button>
+      <a href="/" class="btn btn-ghost">{{ t("cancel") }}</a>
+    </div>
+  </form>
+</div>
+
+<script>
+function toggleFields() {
+  const sheet = document.getElementById('sheet').value;
+  document.getElementById('field-study').classList.toggle('hidden', sheet !== 'Study');
+  document.getElementById('field-reminder').classList.toggle('hidden', sheet !== 'Reminders');
+  document.getElementById('field-event').classList.toggle('hidden', sheet !== 'Events');
+  document.getElementById('field-tasks').classList.toggle('hidden', sheet !== 'Tasks');
+  document.getElementById('field-title').classList.toggle('hidden', sheet === 'Study');
+}
+toggleFields();
+</script>
+{% endblock %}

@@ -1,0 +1,16 @@
+{% if entries %}
+{% for e in entries %}
+<div class="mb-3 pb-3 {% if not loop.last %}border-b border-hub-border{% endif %}">
+  <a href="/kb/entry/{{ e.id }}" class="text-hub-accent hover:underline font-medium text-sm">{{ e.title }}</a>
+  <div class="flex items-center gap-2 mt-1">
+    <span class="badge badge-{{ 'success' if e.confidence.value == 'high' else 'timeout' if e.confidence.value == 'medium' else 'never' }}">{{ e.confidence.value }}</span>
+    {% for tag in e.tags[:3] %}
+    <span class="text-xs text-hub-muted">#{{ tag }}</span>
+    {% endfor %}
+  </div>
+  <p class="text-xs text-hub-muted mt-1">{{ e.summary[:150] }}...</p>
+</div>
+{% endfor %}
+{% else %}
+<p class="text-hub-muted text-sm">No entries in this domain yet.</p>
+{% endif %}

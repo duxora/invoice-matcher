@@ -1,0 +1,88 @@
+#!/usr/bin/env python3
+"""tools — CLI for Tools Hub server."""
+import argparse
+import sys
+from pathlib import Path
+
+ROOT = Path(__file__).parent.resolve()
+sys.path.insert(0, str(ROOT))
+
+def cmd_serve(args):
+    import uvicorn
+    from server.main import app
+    print(f"Tools Hub running at http://localhost:{args.port}")
+    uvicorn.run(app, host="127.0.0.1", port=args.port, log_level="info")
+
+def cmd_install(args):
+    """Install as launchd service."""
+    import os, subprocess
+    label = "com.tools-hub.server"
+    plist_dir = Path.home() / "Library" / "LaunchAgents"
+    plist_dir.mkdir(parents=True, exist_ok=True)
+    plist_path = plist_dir / f"{label}.plist"
+    tools_path = str(Path(__file__).resolve())
+    port = args.port
+
+    plist_content = f"""<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN"
+  "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+    <key>Label</key>
+    <string>{label}</string>
+    <key>ProgramArguments</key>
+    <array>
+        <string>/bin/zsh</string>
+        <string>-l</string>
+        <string>-c</string>
+        <string>{tools_path} serve --port {port}</string>
+    </array>
+    <key>RunAtLoad</key>
+    <true/>
+    <key>KeepAlive</key>
+    <true/>
+    <key>StandardOutPath</key>
+    <string>/tmp/tools-hub.log</string>
+    <key>StandardErrorPath</key>
+    <string>/tmp/tools-hub-error.log</string>
+</dict>
+</plist>"""
+
+    plist_path.write_text(plist_content)
+    uid = os.getuid()
+    subprocess.run(["launchctl", "bootout", f"gui/{uid}/{label}"], capture_output=True)
+    subprocess.run(["launchctl", "bootstrap", f"gui/{uid}", str(plist_path)], capture_output=True)
+    print(f"Installed: {label} on port {port}")
+    print(f"Access: http://localhost:{port}")
+
+def cmd_uninstall(args):
+    """Remove launchd service."""
+    import os, subprocess
+    label = "com.tools-hub.server"
+    plist_path = Path.home() / "Library" / "LaunchAgents" / f"{label}.plist"
+    uid = os.getuid()
+    subprocess.run(["launchctl", "bootout", f"gui/{uid}/{label}"], capture_output=True)
+    if plist_path.exists():
+        plist_path.unlink()
+    print(f"Removed: {label}")
+
+def main():
+    parser = argparse.ArgumentParser(prog="tools", description="Tools Hub")
+    sub = parser.add_subparsers(dest="command", required=True)
+
+    p = sub.add_parser("serve", help="Start web server")
+    p.add_argument("--port", "-p", type=int, default=7070)
+    p.set_defaults(func=cmd_serve)
+
+    p = sub.add_parser("install", help="Install as launchd service")
+    p.add_argument("--port", "-p", type=int, default=7070)
+    p.set_defaults(func=cmd_install)
+
+    p = sub.add_parser("uninstall", help="Remove launchd service")
+    p.set_defaults(func=cmd_uninstall)
+
+    args = parser.parse_args()
+    args.func(args)
+
+if __name__ == "__main__":
+    main()

@@ -1,0 +1,7 @@
+# name: Retry Task
+# schedule: daily 10:00
+# retry: 3
+# retry_delay: 30
+# on_failure: retry
+---
+A task that retries on failure.

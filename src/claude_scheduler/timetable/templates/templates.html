@@ -1,0 +1,44 @@
+{% extends "base.html" %}
+{% block title %}{{ t("templates") }} - {{ t("family_timetable") }}{% endblock %}
+
+{% block content %}
+<div class="mb-2">
+  <a href="/" class="text-hub-accent text-sm hover:underline">&larr; {{ t("back_to_week") }}</a>
+</div>
+
+<div class="mb-6">
+  <h1 class="text-2xl font-bold">{{ t("templates") }}</h1>
+  <p class="text-hub-muted text-sm mt-1">Pre-fill a week with a schedule template</p>
+</div>
+
+<div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 mb-8">
+  {% for tpl in template_list %}
+  <div class="bg-hub-card border border-hub-border rounded-lg p-5">
+    <h3 class="text-lg font-semibold mb-1">{{ tpl.name }}</h3>
+    <p class="text-sm text-hub-muted mb-3">{{ tpl.description }}</p>
+    <p class="text-xs text-hub-muted mb-4">{{ tpl.entry_count }} entries</p>
+
+    <form method="post" action="/apply-template" class="space-y-3">
+      <input type="hidden" name="template_id" value="{{ tpl.id }}">
+      <div class="grid grid-cols-2 gap-2">
+        <div>
+          <label class="block text-xs text-hub-muted mb-1">{{ t("person") }}</label>
+          <select name="person"
+                  class="w-full px-2 py-1.5 text-sm bg-hub-bg border border-hub-border rounded focus:outline-none focus:border-hub-accent">
+            {% for m in family_members %}
+            <option value="{{ m }}">{{ m }}</option>
+            {% endfor %}
+          </select>
+        </div>
+        <div>
+          <label class="block text-xs text-hub-muted mb-1">{{ t("date") }} (Mon)</label>
+          <input type="date" name="start_date" required
+                 class="w-full px-2 py-1.5 text-sm bg-hub-bg border border-hub-border rounded focus:outline-none focus:border-hub-accent">
+        </div>
+      </div>
+      <button type="submit" class="btn btn-primary text-sm w-full">{{ t("apply_template") }}</button>
+    </form>
+  </div>
+  {% endfor %}
+</div>
+{% endblock %}

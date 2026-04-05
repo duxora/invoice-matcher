@@ -1,0 +1,47 @@
+{% extends "base.html" %}
+
+{% block title %}KB Sources{% endblock %}
+
+{% block content %}
+<a href="/kb" class="text-hub-muted hover:text-hub-text text-sm mb-4 inline-block">&larr; Back to Knowledge Base</a>
+
+<div class="flex items-center justify-between mb-6">
+  <h1 class="text-2xl font-bold">📡 Configured Sources</h1>
+  <button class="btn btn-primary"
+          hx-post="/kb/ingest-all"
+          hx-target="#ingest-status"
+          hx-swap="innerHTML">
+    🔄 Run Full Scrape
+  </button>
+</div>
+
+<div id="ingest-status" class="mb-4"></div>
+
+{% for domain, source_list in sources.items() | sort %}
+<div class="bg-hub-card border border-hub-border rounded-lg mb-4">
+  <div class="px-4 py-3 border-b border-hub-border">
+    <h2 class="text-lg font-semibold">{{ domain }}</h2>
+  </div>
+  <div class="p-4">
+    <table class="data-table">
+      <thead>
+        <tr>
+          <th>Type</th>
+          <th>URL</th>
+          <th>Limit</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for src in source_list %}
+        <tr>
+          <td><span class="badge badge-{{ 'running' if src.type == 'rss' else 'timeout' }}">{{ src.type }}</span></td>
+          <td><a href="{{ src.url }}" target="_blank" class="text-hub-accent hover:underline text-xs break-all">{{ src.url }}</a></td>
+          <td class="text-hub-muted">{{ src.get('limit', 5) }}</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+{% endfor %}
+{% endblock %}
