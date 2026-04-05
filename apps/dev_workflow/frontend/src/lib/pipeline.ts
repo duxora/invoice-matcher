@@ -9,9 +9,14 @@ const STEP_ORDER = {
   'solo-commit': ['kb_lookup', 'implement', 'build', 'compact'] as const,
 } satisfies Record<string, readonly string[]>
 
+const DEFAULT_ORDER = STEP_ORDER['code/medium']
+
 export function getStepOrder(pipeline: PipelineType, size: PipelineSize): readonly string[] {
-  const key = pipeline === 'code' ? (`code/${size}` as const) : pipeline
-  return STEP_ORDER[key as keyof typeof STEP_ORDER] ?? STEP_ORDER['code/medium']
+  const key = pipeline === 'code' ? `code/${size}` : pipeline
+  if (key in STEP_ORDER) {
+    return STEP_ORDER[key as keyof typeof STEP_ORDER]
+  }
+  return DEFAULT_ORDER
 }
 
 export function getActiveStep(pipeline: PipelineState): string | null {
