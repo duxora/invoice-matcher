@@ -9,23 +9,23 @@ import MisplacedBanner from './MisplacedBanner'
 // ── constants ──────────────────────────────────────────────────────────────
 
 const PHASES = [
-  { key: 'intake', label: 'Intake', color: 'text-blue-400 bg-blue-950 border-blue-800' },
-  { key: 'backlog', label: 'Backlog', color: 'text-indigo-400 bg-indigo-950 border-indigo-800' },
-  { key: 'implement', label: 'Implement', color: 'text-green-400 bg-green-950 border-green-800' },
-  { key: 'pr_ci', label: 'PR / CI', color: 'text-amber-400 bg-amber-950 border-amber-800' },
-  { key: 'review', label: 'Review', color: 'text-orange-400 bg-orange-950 border-orange-800' },
-  { key: 'deploy', label: 'Deploy', color: 'text-purple-400 bg-purple-950 border-purple-800' },
-  { key: 'verify', label: 'Verify', color: 'text-teal-400 bg-teal-950 border-teal-800' },
-  { key: 'close', label: 'Close', color: 'text-gray-400 bg-gray-800 border-gray-700' },
+  { key: 'intake', label: 'Intake', color: 'text-blue-300 bg-blue-900/60 border-blue-700' },
+  { key: 'backlog', label: 'Backlog', color: 'text-indigo-300 bg-indigo-900/60 border-indigo-700' },
+  { key: 'implement', label: 'Implement', color: 'text-emerald-300 bg-emerald-900/60 border-emerald-700' },
+  { key: 'pr_ci', label: 'PR / CI', color: 'text-amber-300 bg-amber-900/60 border-amber-700' },
+  { key: 'review', label: 'Review', color: 'text-orange-300 bg-orange-900/60 border-orange-700' },
+  { key: 'deploy', label: 'Deploy', color: 'text-purple-300 bg-purple-900/60 border-purple-700' },
+  { key: 'verify', label: 'Verify', color: 'text-teal-300 bg-teal-900/60 border-teal-700' },
+  { key: 'close', label: 'Close', color: 'text-gray-400 bg-gray-700/60 border-gray-600' },
 ] as const
 
 type PhaseKey = (typeof PHASES)[number]['key']
 
 const PRIORITY_BADGE: Record<string, string> = {
-  critical: 'bg-red-950 text-red-400 border border-red-800',
-  high: 'bg-orange-950 text-orange-400 border border-orange-800',
-  medium: 'bg-yellow-950 text-yellow-400 border border-yellow-800',
-  low: 'bg-gray-800 text-gray-500 border border-gray-700',
+  critical: 'bg-red-900/80 text-red-200 border border-red-600',
+  high: 'bg-orange-900/80 text-orange-200 border border-orange-600',
+  medium: 'bg-yellow-900/80 text-yellow-200 border border-yellow-600',
+  low: 'bg-gray-700/80 text-gray-400 border border-gray-600',
 }
 
 const PRIORITY_ORDER: Record<string, number> = {
@@ -36,10 +36,10 @@ const PRIORITY_ORDER: Record<string, number> = {
 }
 
 const STATUS_BADGE: Record<string, string> = {
-  open: 'bg-blue-950 text-blue-400 border border-blue-800',
-  in_progress: 'bg-amber-950 text-amber-400 border border-amber-800',
-  backlog: 'bg-indigo-950 text-indigo-400 border border-indigo-800',
-  done: 'bg-green-950 text-green-400 border border-green-800',
+  open: 'bg-blue-900/80 text-blue-200 border border-blue-600',
+  in_progress: 'bg-amber-900/80 text-amber-200 border border-amber-600',
+  backlog: 'bg-indigo-900/80 text-indigo-200 border border-indigo-600',
+  done: 'bg-emerald-900/80 text-emerald-200 border border-emerald-600',
 }
 
 const STATUS_OPTIONS = [
@@ -65,17 +65,17 @@ function ProjectCard({ label, open, inProgress, done, active, onClick }: Project
   return (
     <button
       onClick={onClick}
-      className={`flex flex-col gap-1 px-3 py-2 rounded-lg border transition-colors text-left ${
+      className={`flex flex-col gap-1.5 px-3.5 py-2.5 rounded-lg border transition-all text-left ${
         active
-          ? 'bg-gray-800 border-blue-500'
-          : 'bg-gray-800 border-gray-700 hover:border-gray-600'
+          ? 'bg-slate-700/80 border-blue-400 shadow-sm shadow-blue-500/10'
+          : 'bg-slate-800/60 border-slate-600/80 hover:border-slate-500 hover:bg-slate-700/50'
       }`}
     >
-      <span className="text-xs font-medium text-gray-200 truncate max-w-[120px]">{label}</span>
-      <div className="flex items-center gap-2">
-        <span className="text-[10px] text-blue-400">{open} open</span>
-        <span className="text-[10px] text-amber-400">{inProgress} in prog</span>
-        <span className="text-[10px] text-green-400">{done} done</span>
+      <span className="text-xs font-semibold text-slate-100 truncate max-w-[140px]">{label}</span>
+      <div className="flex items-center gap-2.5">
+        <span className="text-[11px] text-blue-300 font-medium">{open} open</span>
+        <span className="text-[11px] text-amber-300 font-medium">{inProgress} in prog</span>
+        <span className="text-[11px] text-emerald-300 font-medium">{done} done</span>
       </div>
     </button>
   )
@@ -92,13 +92,13 @@ function PhaseChip({ phase, count, active, onClick }: PhaseChipProps) {
   return (
     <button
       onClick={onClick}
-      className={`flex items-center gap-1.5 px-2 py-1 rounded border text-[10px] font-medium transition-colors ${phase.color} ${
-        active ? 'ring-1 ring-blue-400' : 'opacity-70 hover:opacity-100'
+      className={`flex items-center gap-1.5 px-2.5 py-1 rounded-md border text-[11px] font-medium transition-all ${phase.color} ${
+        active ? 'ring-1 ring-blue-400 shadow-sm' : 'opacity-75 hover:opacity-100'
       }`}
     >
       <span>{phase.label}</span>
       {count > 0 && (
-        <span className="bg-gray-950/60 px-1 rounded text-[9px]">{count}</span>
+        <span className="bg-white/10 px-1.5 rounded text-[10px] font-semibold">{count}</span>
       )}
     </button>
   )
@@ -114,54 +114,53 @@ interface TaskRowProps {
 function TaskRow({ task, selected, onSelect, onOpenDetail }: TaskRowProps) {
   return (
     <div
-      className={`px-3 py-2 rounded border transition-colors ${
+      className={`px-3 py-2.5 rounded-lg border transition-all ${
         selected
-          ? 'bg-gray-800 border-gray-600'
-          : 'border-transparent hover:bg-gray-800 hover:border-gray-700'
+          ? 'bg-slate-700/60 border-slate-500'
+          : 'border-transparent hover:bg-slate-800/60 hover:border-slate-700'
       }`}
     >
-      {/* Desktop: single row / Mobile: stacked */}
-      <div className="flex items-start gap-2">
+      <div className="flex items-start gap-2.5">
         {/* Checkbox */}
         <input
           type="checkbox"
           checked={selected}
           onChange={(e) => onSelect(task.id, e.target.checked)}
           onClick={(e) => e.stopPropagation()}
-          className="shrink-0 accent-blue-500 cursor-pointer mt-0.5"
+          className="shrink-0 accent-blue-400 cursor-pointer mt-0.5"
           aria-label={`Select task #${task.id}`}
         />
 
         {/* ID */}
-        <span className="text-[10px] text-gray-600 shrink-0 mt-0.5">#{task.id}</span>
+        <span className="text-[11px] text-slate-400 shrink-0 mt-0.5 font-mono">#{task.id}</span>
 
         {/* Content area */}
         <div className="flex-1 min-w-0">
           {/* Title row */}
           <button
-            className="text-xs text-gray-300 text-left hover:text-gray-100 transition-colors line-clamp-2 md:line-clamp-1 w-full"
+            className="text-[13px] text-slate-200 text-left hover:text-white transition-colors line-clamp-2 md:line-clamp-1 w-full leading-snug"
             onClick={() => onOpenDetail(task.id)}
           >
             {task.title}
           </button>
 
-          {/* Meta row — badges wrap on mobile */}
-          <div className="flex flex-wrap items-center gap-1.5 mt-1">
+          {/* Meta row */}
+          <div className="flex flex-wrap items-center gap-1.5 mt-1.5">
             <span
-              className={`text-[10px] px-1.5 py-0.5 rounded ${PRIORITY_BADGE[task.priority] ?? 'bg-gray-800 text-gray-500'}`}
+              className={`text-[10px] px-1.5 py-0.5 rounded-md font-medium ${PRIORITY_BADGE[task.priority] ?? 'bg-gray-700 text-gray-400'}`}
             >
               {task.priority}
             </span>
             <span
-              className={`text-[10px] px-1.5 py-0.5 rounded ${STATUS_BADGE[task.status] ?? 'bg-gray-800 text-gray-400'}`}
+              className={`text-[10px] px-1.5 py-0.5 rounded-md font-medium ${STATUS_BADGE[task.status] ?? 'bg-gray-700 text-gray-400'}`}
             >
               {task.status.replace('_', ' ')}
             </span>
-            <span className="text-[10px] text-gray-500 truncate max-w-[120px]">
+            <span className="text-[11px] text-slate-400 truncate max-w-[140px]">
               {task.project_name ?? task.project_id}
             </span>
             {task.domain && (
-              <span className="text-[10px] text-gray-600 bg-gray-800 px-1.5 py-0.5 rounded">
+              <span className="text-[10px] text-slate-300 bg-slate-700/80 px-1.5 py-0.5 rounded-md border border-slate-600">
                 {task.domain}
               </span>
             )}
@@ -171,7 +170,7 @@ function TaskRow({ task, selected, onSelect, onOpenDetail }: TaskRowProps) {
                 target="_blank"
                 rel="noopener noreferrer"
                 onClick={(e) => e.stopPropagation()}
-                className="text-[10px] text-blue-500 hover:text-blue-400"
+                className="text-[11px] text-blue-300 hover:text-blue-200 font-medium"
               >
                 PR#{task.pr_number}
               </a>
@@ -285,22 +284,21 @@ export default function TaskBoard() {
   const hasError = tasksError || projectsError
 
   return (
-    <div className="flex flex-col h-full text-gray-100 bg-gray-950">
+    <div className="flex flex-col h-full text-slate-100 bg-slate-900">
       {/* Header */}
-      <div className="flex items-center justify-between px-4 pl-12 lg:pl-4 py-2.5 border-b border-gray-800 shrink-0">
-        <div className="flex items-center gap-2">
-          <h1 className="text-sm font-semibold text-gray-100">Dev Workflow</h1>
+      <div className="flex items-center justify-between px-5 pl-12 lg:pl-5 py-3 border-b border-slate-700/60 shrink-0 bg-slate-800/40">
+        <div className="flex items-center gap-2.5">
+          <h1 className="text-base font-bold text-white tracking-tight">Dev Workflow</h1>
           {hasError && (
-            <span className="text-[10px] text-red-400 bg-red-950 px-1.5 py-0.5 rounded border border-red-800">
+            <span className="text-[11px] text-red-300 bg-red-900/60 px-2 py-0.5 rounded-md border border-red-700">
               API error
             </span>
           )}
         </div>
-        <div className="flex items-center gap-3">
-          {/* Settings gear — opens domain map modal */}
+        <div className="flex items-center gap-4">
           <button
             onClick={() => setDomainMapOpen(true)}
-            className="text-[10px] text-gray-500 hover:text-gray-300 transition-colors"
+            className="text-sm text-slate-400 hover:text-white transition-colors"
             aria-label="Domain map settings"
             title="Domain Map"
           >
@@ -310,23 +308,23 @@ export default function TaskBoard() {
             href="http://localhost:7070"
             target="_blank"
             rel="noopener noreferrer"
-            className="text-[10px] text-blue-400 hover:text-blue-300"
+            className="text-[11px] text-blue-300 hover:text-blue-200 font-medium"
           >
-            Dev Site
+            Dev Site ↗
           </a>
           <a
             href="https://github.com"
             target="_blank"
             rel="noopener noreferrer"
-            className="text-[10px] text-blue-400 hover:text-blue-300"
+            className="text-[11px] text-blue-300 hover:text-blue-200 font-medium"
           >
-            GitHub
+            GitHub ↗
           </a>
         </div>
       </div>
 
       {/* Project summary cards */}
-      <div className="flex flex-wrap gap-2 px-4 py-2 border-b border-gray-800 shrink-0">
+      <div className="flex flex-wrap gap-2 px-5 py-3 border-b border-slate-700/60 shrink-0">
         <ProjectCard
           label="All"
           open={allCounts.open}
@@ -347,12 +345,12 @@ export default function TaskBoard() {
           />
         ))}
         {projectsError && (
-          <span className="text-[10px] text-red-400">Failed to load projects</span>
+          <span className="text-[11px] text-red-300">Failed to load projects</span>
         )}
       </div>
 
       {/* Phase strip */}
-      <div className="flex items-center gap-1.5 px-4 py-2 border-b border-gray-800 overflow-x-auto shrink-0">
+      <div className="flex flex-wrap items-center gap-1.5 px-5 py-2.5 border-b border-slate-700/60 shrink-0">
         {PHASES.map((phase) => (
           <PhaseChip
             key={phase.key}
@@ -365,7 +363,7 @@ export default function TaskBoard() {
         {phaseFilter && (
           <button
             onClick={() => setPhaseFilter('')}
-            className="text-[10px] text-gray-500 hover:text-gray-300 ml-1 underline shrink-0"
+            className="text-[11px] text-slate-400 hover:text-white ml-1 underline shrink-0"
           >
             clear
           </button>
@@ -373,18 +371,18 @@ export default function TaskBoard() {
       </div>
 
       {/* Filter bar */}
-      <div className="flex flex-wrap items-center gap-2 px-4 py-2 border-b border-gray-800 shrink-0">
+      <div className="flex flex-wrap items-center gap-2 px-5 py-2.5 border-b border-slate-700/60 shrink-0 bg-slate-800/30">
         <input
           type="text"
           value={search}
           onChange={(e) => setSearch(e.target.value)}
           placeholder="Search by ID or title..."
-          className="text-xs bg-gray-900 border border-gray-700 rounded px-2 py-1.5 text-gray-300 w-full sm:w-52 placeholder-gray-600"
+          className="text-xs bg-slate-800 border border-slate-600 rounded-md px-3 py-1.5 text-slate-200 w-full sm:w-52 placeholder-slate-500 focus:border-blue-500 focus:outline-none transition-colors"
         />
         <select
           value={projectFilter}
           onChange={(e) => setProjectFilter(e.target.value)}
-          className="text-xs bg-gray-900 border border-gray-700 rounded px-2 py-1.5 text-gray-300 flex-1 sm:flex-none"
+          className="text-xs bg-slate-800 border border-slate-600 rounded-md px-3 py-1.5 text-slate-200 flex-1 sm:flex-none"
         >
           <option value="">All Projects</option>
           {(projects ?? []).map((p) => (
@@ -396,7 +394,7 @@ export default function TaskBoard() {
         <select
           value={statusFilter}
           onChange={(e) => setStatusFilter(e.target.value)}
-          className="text-xs bg-gray-900 border border-gray-700 rounded px-2 py-1.5 text-gray-300 flex-1 sm:flex-none"
+          className="text-xs bg-slate-800 border border-slate-600 rounded-md px-3 py-1.5 text-slate-200 flex-1 sm:flex-none"
         >
           {STATUS_OPTIONS.map((opt) => (
             <option key={opt.value} value={opt.value}>
@@ -404,7 +402,7 @@ export default function TaskBoard() {
             </option>
           ))}
         </select>
-        <span className="text-[10px] text-gray-600 ml-auto">
+        <span className="text-[11px] text-slate-400 ml-auto font-medium">
           {visibleTasks.length} task{visibleTasks.length !== 1 ? 's' : ''}
         </span>
       </div>
@@ -413,26 +411,26 @@ export default function TaskBoard() {
       <MisplacedBanner projectFilter={projectFilter} />
 
       {/* Task list */}
-      <div className="flex-1 overflow-y-auto px-2 py-2">
+      <div className="flex-1 overflow-y-auto px-3 py-2">
         {tasks === undefined && !tasksError && (
           <div className="flex items-center justify-center h-24">
-            <span className="text-xs text-gray-600">Loading...</span>
+            <span className="text-xs text-slate-500">Loading...</span>
           </div>
         )}
         {tasksError && (
           <div className="flex items-center justify-center h-24">
-            <span className="text-xs text-red-400">Failed to load tasks</span>
+            <span className="text-xs text-red-300">Failed to load tasks</span>
           </div>
         )}
         {tasks !== undefined && visibleTasks.length === 0 && !tasksError && (
           <div className="flex items-center justify-center h-24">
-            <span className="text-xs text-gray-600">No tasks found</span>
+            <span className="text-xs text-slate-500">No tasks found</span>
           </div>
         )}
 
         {/* Select-all header row */}
         {visibleTasks.length > 0 && (
-          <div className="flex items-center gap-2 px-3 py-1 mb-0.5">
+          <div className="flex items-center gap-2.5 px-3 py-1.5 mb-1">
             <input
               type="checkbox"
               checked={allVisibleSelected}
@@ -440,10 +438,10 @@ export default function TaskBoard() {
                 if (el) el.indeterminate = someVisibleSelected && !allVisibleSelected
               }}
               onChange={(e) => handleSelectAll(e.target.checked)}
-              className="shrink-0 accent-blue-500 cursor-pointer"
+              className="shrink-0 accent-blue-400 cursor-pointer"
               aria-label="Select all visible tasks"
             />
-            <span className="text-[10px] text-gray-600">
+            <span className="text-[11px] text-slate-400 font-medium">
               {selectedTasks.size > 0 ? `${selectedTasks.size} selected` : 'Select all'}
             </span>
           </div>
