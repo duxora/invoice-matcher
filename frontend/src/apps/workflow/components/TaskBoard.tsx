@@ -28,6 +28,13 @@ const PRIORITY_BADGE: Record<string, string> = {
   low: 'bg-gray-800 text-gray-500 border border-gray-700',
 }
 
+const PRIORITY_ORDER: Record<string, number> = {
+  critical: 0,
+  high: 1,
+  medium: 2,
+  low: 3,
+}
+
 const STATUS_BADGE: Record<string, string> = {
   open: 'bg-blue-950 text-blue-400 border border-blue-800',
   in_progress: 'bg-amber-950 text-amber-400 border border-amber-800',
@@ -107,75 +114,71 @@ interface TaskRowProps {
 function TaskRow({ task, selected, onSelect, onOpenDetail }: TaskRowProps) {
   return (
     <div
-      className={`flex items-center gap-2 px-3 py-2 rounded border transition-colors ${
+      className={`px-3 py-2 rounded border transition-colors ${
         selected
           ? 'bg-gray-800 border-gray-600'
           : 'border-transparent hover:bg-gray-800 hover:border-gray-700'
       }`}
     >
-      {/* Checkbox */}
-      <input
-        type="checkbox"
-        checked={selected}
-        onChange={(e) => onSelect(task.id, e.target.checked)}
-        onClick={(e) => e.stopPropagation()}
-        className="shrink-0 accent-blue-500 cursor-pointer"
-        aria-label={`Select task #${task.id}`}
-      />
-
-      {/* ID */}
-      <span className="text-[10px] text-gray-600 w-10 shrink-0 text-right">#{task.id}</span>
-
-      {/* Title — click to open detail */}
-      <button
-        className="text-xs text-gray-300 truncate flex-1 min-w-0 text-left hover:text-gray-100 transition-colors"
-        onClick={() => onOpenDetail(task.id)}
-      >
-        {task.title}
-      </button>
-
-      {/* Priority */}
-      <span
-        className={`text-[10px] px-1.5 py-0.5 rounded ${PRIORITY_BADGE[task.priority] ?? 'bg-gray-800 text-gray-500'}`}
-      >
-        {task.priority}
-      </span>
-
-      {/* Status */}
-      <span
-        className={`text-[10px] px-1.5 py-0.5 rounded w-20 text-center ${STATUS_BADGE[task.status] ?? 'bg-gray-800 text-gray-400'}`}
-      >
-        {task.status.replace('_', ' ')}
-      </span>
-
-      {/* Project */}
-      <span className="text-[10px] text-gray-500 w-24 truncate shrink-0">
-        {task.project_name ?? task.project_id}
-      </span>
-
-      {/* Domain */}
-      {task.domain ? (
-        <span className="text-[10px] text-gray-600 bg-gray-800 px-1.5 py-0.5 rounded shrink-0">
-          {task.domain}
-        </span>
-      ) : (
-        <span className="w-12 shrink-0" />
-      )}
-
-      {/* PR link */}
-      {task.pr_number != null ? (
-        <a
-          href={`https://github.com/search?q=${encodeURIComponent(task.branch ?? String(task.pr_number))}`}
-          target="_blank"
-          rel="noopener noreferrer"
+      {/* Desktop: single row / Mobile: stacked */}
+      <div className="flex items-start gap-2">
+        {/* Checkbox */}
+        <input
+          type="checkbox"
+          checked={selected}
+          onChange={(e) => onSelect(task.id, e.target.checked)}
           onClick={(e) => e.stopPropagation()}
-          className="text-[10px] text-blue-500 hover:text-blue-400 shrink-0"
-        >
-          PR#{task.pr_number}
-        </a>
-      ) : (
-        <span className="w-10 shrink-0" />
-      )}
+          className="shrink-0 accent-blue-500 cursor-pointer mt-0.5"
+          aria-label={`Select task #${task.id}`}
+        />
+
+        {/* ID */}
+        <span className="text-[10px] text-gray-600 shrink-0 mt-0.5">#{task.id}</span>
+
+        {/* Content area */}
+        <div className="flex-1 min-w-0">
+          {/* Title row */}
+          <button
+            className="text-xs text-gray-300 text-left hover:text-gray-100 transition-colors line-clamp-2 md:line-clamp-1 w-full"
+            onClick={() => onOpenDetail(task.id)}
+          >
+            {task.title}
+          </button>
+
+          {/* Meta row — badges wrap on mobile */}
+          <div className="flex flex-wrap items-center gap-1.5 mt-1">
+            <span
+              className={`text-[10px] px-1.5 py-0.5 rounded ${PRIORITY_BADGE[task.priority] ?? 'bg-gray-800 text-gray-500'}`}
+            >
+              {task.priority}
+            </span>
+            <span
+              className={`text-[10px] px-1.5 py-0.5 rounded ${STATUS_BADGE[task.status] ?? 'bg-gray-800 text-gray-400'}`}
+            >
+              {task.status.replace('_', ' ')}
+            </span>
+            <span className="text-[10px] text-gray-500 truncate max-w-[120px]">
+              {task.project_name ?? task.project_id}
+            </span>
+            {task.domain && (
+              <span className="text-[10px] text-gray-600 bg-gray-800 px-1.5 py-0.5 rounded">
+                {task.domain}
+              </span>
+            )}
+            {task.pr_number != null && (
+              <a
+                href={`https://github.com/search?q=${encodeURIComponent(task.branch ?? String(task.pr_number))}`}
+                target="_blank"
+                rel="noopener noreferrer"
+                onClick={(e) => e.stopPropagation()}
+                className="text-[10px] text-blue-500 hover:text-blue-400"
+              >
+                PR#{task.pr_number}
+              </a>
+            )}
+          </div>
+        </div>
+      </div>
     </div>
   )
 }
@@ -221,7 +224,7 @@ export default function TaskBoard() {
     return counts
   }, [tasks])
 
-  // Client-side filtering: search + phase
+  // Client-side filtering: search + phase, sorted by priority (high → low)
   const visibleTasks = useMemo(() => {
     let result = tasks ?? []
     if (phaseFilter) {
@@ -233,7 +236,9 @@ export default function TaskBoard() {
         (t) => String(t.id).includes(q) || t.title.toLowerCase().includes(q),
       )
     }
-    return result
+    return [...result].sort(
+      (a, b) => (PRIORITY_ORDER[a.priority] ?? 9) - (PRIORITY_ORDER[b.priority] ?? 9),
+    )
   }, [tasks, phaseFilter, search])
 
   const handleProjectClick = (projectId: string) => {
@@ -282,7 +287,7 @@ export default function TaskBoard() {
   return (
     <div className="flex flex-col h-full text-gray-100 bg-gray-950">
       {/* Header */}
-      <div className="flex items-center justify-between px-4 py-2.5 border-b border-gray-800 shrink-0">
+      <div className="flex items-center justify-between px-4 pl-12 lg:pl-4 py-2.5 border-b border-gray-800 shrink-0">
         <div className="flex items-center gap-2">
           <h1 className="text-sm font-semibold text-gray-100">Dev Workflow</h1>
           {hasError && (
@@ -368,18 +373,18 @@ export default function TaskBoard() {
       </div>
 
       {/* Filter bar */}
-      <div className="flex items-center gap-2 px-4 py-2 border-b border-gray-800 shrink-0">
+      <div className="flex flex-wrap items-center gap-2 px-4 py-2 border-b border-gray-800 shrink-0">
         <input
           type="text"
           value={search}
           onChange={(e) => setSearch(e.target.value)}
           placeholder="Search by ID or title..."
-          className="text-xs bg-gray-900 border border-gray-700 rounded px-2 py-1 text-gray-300 w-52 placeholder-gray-600"
+          className="text-xs bg-gray-900 border border-gray-700 rounded px-2 py-1.5 text-gray-300 w-full sm:w-52 placeholder-gray-600"
         />
         <select
           value={projectFilter}
           onChange={(e) => setProjectFilter(e.target.value)}
-          className="text-xs bg-gray-900 border border-gray-700 rounded px-2 py-1 text-gray-300"
+          className="text-xs bg-gray-900 border border-gray-700 rounded px-2 py-1.5 text-gray-300 flex-1 sm:flex-none"
         >
           <option value="">All Projects</option>
           {(projects ?? []).map((p) => (
@@ -391,7 +396,7 @@ export default function TaskBoard() {
         <select
           value={statusFilter}
           onChange={(e) => setStatusFilter(e.target.value)}
-          className="text-xs bg-gray-900 border border-gray-700 rounded px-2 py-1 text-gray-300"
+          className="text-xs bg-gray-900 border border-gray-700 rounded px-2 py-1.5 text-gray-300 flex-1 sm:flex-none"
         >
           {STATUS_OPTIONS.map((opt) => (
             <option key={opt.value} value={opt.value}>

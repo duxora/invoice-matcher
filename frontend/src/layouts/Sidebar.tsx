@@ -2,7 +2,11 @@ import { NavLink } from 'react-router-dom'
 import { HUB_APPS } from '../shared/apps'
 import { theme } from '../shared/theme'
 
-export default function Sidebar() {
+interface SidebarProps {
+  onNavigate?: () => void
+}
+
+export default function Sidebar({ onNavigate }: SidebarProps) {
   return (
     <aside
       className={`w-56 min-h-screen flex flex-col ${theme.sidebar.bg} ${theme.sidebar.border} border-r shrink-0`}
@@ -34,6 +38,7 @@ export default function Sidebar() {
                 <li key={app.id}>
                   <NavLink
                     to={app.path}
+                    onClick={onNavigate}
                     className={({ isActive }) =>
                       `${baseClasses} ${
                         isActive
@@ -53,6 +58,7 @@ export default function Sidebar() {
               <li key={app.id}>
                 <a
                   href={app.path}
+                  onClick={onNavigate}
                   className={`${baseClasses} ${theme.sidebar.text}`}
                   aria-label={app.description}
                 >

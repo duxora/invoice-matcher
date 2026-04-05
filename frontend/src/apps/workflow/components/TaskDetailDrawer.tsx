@@ -124,7 +124,7 @@ export default function TaskDetailDrawer({ taskId, onClose }: TaskDetailDrawerPr
 
       {/* Drawer panel */}
       <div
-        className="fixed top-0 right-0 z-30 h-full w-[400px] bg-gray-900 border-l border-gray-700 flex flex-col shadow-2xl"
+        className="fixed top-0 right-0 z-30 h-full w-full sm:w-[400px] bg-gray-900 border-l border-gray-700 flex flex-col shadow-2xl"
         role="dialog"
         aria-modal="true"
         aria-label="Task detail"
