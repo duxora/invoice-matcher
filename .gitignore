@@ -9,4 +9,5 @@ dist/
 build/
 .eggs/
 credentials.json
+.credentials/
 .env
