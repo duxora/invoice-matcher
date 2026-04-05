@@ -1,9 +1,10 @@
 """Tools Hub — FastAPI application."""
 from fastapi import FastAPI, Request
-from fastapi.responses import HTMLResponse
+from fastapi.responses import HTMLResponse, RedirectResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 from pathlib import Path
+from starlette.responses import FileResponse
 
 app = FastAPI(title="Tools Hub")
 
@@ -18,8 +19,21 @@ APPS = []
 def register_app(name: str, description: str, prefix: str, icon: str = "🔧"):
     APPS.append({"name": name, "description": description, "prefix": prefix, "icon": icon})
 
-# Register apps
-from fastapi.responses import RedirectResponse
+
+# ── SPA asset serving (must be registered BEFORE app routers) ─────────────
+
+_SPA_DIST = REPO_ROOT / "frontend" / "dist"
+
+@app.get("/assets/{file_path:path}", include_in_schema=False)
+async def serve_spa_asset(file_path: str):
+    """Serve hashed JS/CSS assets from frontend/dist/assets/."""
+    full_path = _SPA_DIST / "assets" / file_path
+    if full_path.is_file():
+        return FileResponse(str(full_path))
+    return FileResponse(str(_SPA_DIST / "index.html"), status_code=404)
+
+
+# ── Register app routers ─────────────────────────────────────────────────────
 
 from apps.scheduler.routes import router as scheduler_router
 register_app("Scheduler", "Claude task scheduler dashboard", "/scheduler", "📋")
@@ -43,23 +57,17 @@ except Exception as e:
     traceback.print_exc()
 
 # Redirect /prefix → /prefix/ for all app router prefixes
-# (FastAPI doesn't auto-redirect for include_router prefixes)
 for _prefix in ["/workflow", "/scheduler", "/kb", "/telegram-bridge"]:
     app.get(_prefix, include_in_schema=False)(
         lambda _p=_prefix: RedirectResponse(f"{_p}/", status_code=307)
     )
 
 
-# ── Unified React SPA serving ────────────────────────────────────────────────
-# Mount frontend/dist with html=True so Starlette serves index.html for
-# directory requests and all static assets. Must be LAST — after all API routers.
-
-_SPA_DIST = REPO_ROOT / "frontend" / "dist"
+# ── SPA catch-all ────────────────────────────────────────────────────────────
 
 if _SPA_DIST.exists():
     app.mount("/", StaticFiles(directory=str(_SPA_DIST), html=True), name="spa")
 else:
-    # No SPA build — fall back to Jinja portal
     @app.get("/", response_class=HTMLResponse)
     async def portal(request: Request):
         return templates.TemplateResponse("portal.html", {"request": request, "apps": APPS})
