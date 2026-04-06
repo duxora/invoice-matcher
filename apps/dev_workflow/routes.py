@@ -980,6 +980,208 @@ def _detect_phase(task) -> str:
     return "backlog"
 
 
+@router.get("/api/insights", response_class=JSONResponse)
+async def api_insights(
+    pipeline: Optional[str] = Query(None),
+    size: Optional[str] = Query(None),
+    period: Optional[str] = Query("30d"),
+):
+    from datetime import timedelta
+
+    conn = get_tkt_db()
+    if not conn:
+        return JSONResponse(
+            {
+                "flow_efficiency": [],
+                "steps": [],
+                "alerts": [],
+                "total_runs": 0,
+                "period": period or "30d",
+            }
+        )
+
+    # ── Period cutoff ──────────────────────────────────────────────────────────
+    period = period or "30d"
+    cutoff: Optional[str] = None
+    if period != "all":
+        days_map = {"7d": 7, "30d": 30, "90d": 90}
+        days = days_map.get(period, 30)
+        cutoff = (datetime.utcnow() - timedelta(days=days)).strftime("%Y-%m-%dT%H:%M:%S")
+
+    # ── Build WHERE clause ─────────────────────────────────────────────────────
+    conditions: list[str] = []
+    params: list = []
+
+    if cutoff:
+        conditions.append("started_at >= ?")
+        params.append(cutoff)
+    if pipeline:
+        conditions.append("pipeline = ?")
+        params.append(pipeline)
+    if size:
+        conditions.append("size = ?")
+        params.append(size)
+
+    where = ("WHERE " + " AND ".join(conditions)) if conditions else ""
+
+    # ── flow_efficiency (GROUP BY size) ───────────────────────────────────────
+    fe_rows = conn.execute(
+        f"""
+        SELECT
+            size,
+            CAST(AVG(duration_s) AS INTEGER) AS avg_duration_s,
+            MIN(duration_s) AS min_duration_s,
+            MAX(duration_s) AS max_duration_s,
+            COUNT(*) AS count
+        FROM pipeline_runs
+        {where}
+        GROUP BY size
+        ORDER BY avg_duration_s
+        """,
+        params,
+    ).fetchall()
+
+    flow_efficiency = [
+        {
+            "size": r["size"],
+            "avg_duration_s": r["avg_duration_s"],
+            "min_duration_s": r["min_duration_s"],
+            "max_duration_s": r["max_duration_s"],
+            "count": r["count"],
+        }
+        for r in fe_rows
+    ]
+
+    # ── total_runs & avg pipeline duration ────────────────────────────────────
+    summary = conn.execute(
+        f"SELECT COUNT(*) AS cnt, AVG(duration_s) AS avg_dur FROM pipeline_runs {where}",
+        params,
+    ).fetchone()
+    total_runs: int = summary["cnt"] if summary else 0
+    avg_pipeline_duration: float = summary["avg_dur"] or 0.0
+
+    # ── steps aggregation (parse JSON per row) ────────────────────────────────
+    run_rows = conn.execute(
+        f"SELECT steps FROM pipeline_runs {where}", params
+    ).fetchall()
+
+    # step_name -> {durations, done, failed, skipped, total}
+    step_data: dict[str, dict] = {}
+
+    for row in run_rows:
+        try:
+            steps_json: dict = jsonlib.loads(row["steps"] or "{}")
+        except (ValueError, TypeError):
+            continue
+
+        for step_name, info in steps_json.items():
+            if step_name not in step_data:
+                step_data[step_name] = {
+                    "durations": [],
+                    "done": 0,
+                    "failed": 0,
+                    "skipped": 0,
+                    "total": 0,
+                }
+            entry = step_data[step_name]
+            entry["total"] += 1
+
+            status = (info.get("status") or "").lower()
+            if status == "done":
+                entry["done"] += 1
+            elif status in ("failed", "error"):
+                entry["failed"] += 1
+            elif status in ("skipped", "skip"):
+                entry["skipped"] += 1
+
+            # Duration: prefer explicit duration_s, fall back to timestamps
+            dur = info.get("duration_s")
+            if dur is None:
+                started = info.get("started_at")
+                completed = info.get("completed_at")
+                if started and completed:
+                    try:
+                        fmt = "%Y-%m-%dT%H:%M:%S"
+                        dur = int(
+                            (
+                                datetime.strptime(completed[:19], fmt)
+                                - datetime.strptime(started[:19], fmt)
+                            ).total_seconds()
+                        )
+                    except (ValueError, TypeError):
+                        dur = None
+            if dur is not None and isinstance(dur, (int, float)) and dur >= 0:
+                entry["durations"].append(dur)
+
+    steps_list = []
+    for step_name, entry in sorted(step_data.items()):
+        total = entry["total"]
+        durations = entry["durations"]
+        avg_dur = int(sum(durations) / len(durations)) if durations else 0
+        steps_list.append(
+            {
+                "name": step_name,
+                "avg_duration_s": avg_dur,
+                "skip_rate": round(entry["skipped"] / total, 4) if total else 0.0,
+                "fail_rate": round(entry["failed"] / total, 4) if total else 0.0,
+                "count": total,
+            }
+        )
+
+    # ── alerts ────────────────────────────────────────────────────────────────
+    alerts = []
+
+    # bottleneck: step whose avg_duration_s > 40% of avg total pipeline duration
+    if avg_pipeline_duration > 0:
+        for s in steps_list:
+            if s["avg_duration_s"] > 0:
+                pct = s["avg_duration_s"] / avg_pipeline_duration
+                if pct > 0.40:
+                    alerts.append(
+                        {
+                            "type": "bottleneck",
+                            "step": s["name"],
+                            "message": f"{round(pct * 100)}% of total pipeline time",
+                        }
+                    )
+
+    # high_fail: fail_rate > 0.10
+    for s in steps_list:
+        if s["fail_rate"] > 0.10:
+            alerts.append(
+                {
+                    "type": "high_fail",
+                    "step": s["name"],
+                    "value": s["fail_rate"],
+                    "message": f"{round(s['fail_rate'] * 100)}% fail rate",
+                }
+            )
+
+    # high_skip: skip_rate > 0.40
+    for s in steps_list:
+        if s["skip_rate"] > 0.40:
+            alerts.append(
+                {
+                    "type": "high_skip",
+                    "step": s["name"],
+                    "value": s["skip_rate"],
+                    "message": f"Skipped {round(s['skip_rate'] * 100)}% of runs",
+                }
+            )
+
+    conn.close()
+
+    return JSONResponse(
+        {
+            "flow_efficiency": flow_efficiency,
+            "steps": steps_list,
+            "alerts": alerts,
+            "total_runs": total_runs,
+            "period": period,
+        }
+    )
+
+
 # ── SPA catch-all for non-API routes ─────────────────────────────────────────
 # React Router handles /workflow, /workflow/pipelines, /workflow/sessions etc.
 
