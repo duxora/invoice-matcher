@@ -71,3 +71,34 @@ export type DetailTarget =
   | { kind: 'pipeline'; pipeline: PipelineState }
   | { kind: 'session'; session: Session }
   | { kind: 'task'; task: Task }
+
+export interface InsightsFlowEfficiency {
+  size: string
+  avg_duration_s: number
+  min_duration_s: number
+  max_duration_s: number
+  count: number
+}
+
+export interface InsightsStep {
+  name: string
+  avg_duration_s: number
+  skip_rate: number
+  fail_rate: number
+  count: number
+}
+
+export interface InsightsAlert {
+  type: 'bottleneck' | 'high_fail' | 'high_skip'
+  step: string
+  value?: number
+  message: string
+}
+
+export interface InsightsResponse {
+  flow_efficiency: InsightsFlowEfficiency[]
+  steps: InsightsStep[]
+  alerts: InsightsAlert[]
+  total_runs: number
+  period: string
+}

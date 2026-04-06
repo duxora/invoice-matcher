@@ -1,0 +1,133 @@
+import { useState } from 'react'
+import { useInsights } from '../hooks/useInsights'
+import FlowEfficiencyCards from '../components/FlowEfficiencyCards'
+import InsightsStrip from '../components/InsightsStrip'
+import InsightAlerts from '../components/InsightAlerts'
+
+const PIPELINE_OPTIONS = [
+  { value: '', label: 'All pipelines' },
+  { value: 'code', label: 'Code' },
+  { value: 'research', label: 'Research' },
+  { value: 'docs', label: 'Docs' },
+  { value: 'solo-commit', label: 'Solo commit' },
+]
+
+const SIZE_OPTIONS = [
+  { value: '', label: 'All sizes' },
+  { value: 'small', label: 'Small' },
+  { value: 'medium', label: 'Medium' },
+  { value: 'large', label: 'Large' },
+]
+
+const PERIOD_OPTIONS = [
+  { value: '7d', label: '7d' },
+  { value: '30d', label: '30d' },
+  { value: '90d', label: '90d' },
+  { value: 'all', label: 'All' },
+]
+
+export default function InsightsPage() {
+  const [pipeline, setPipeline] = useState('')
+  const [size, setSize] = useState('')
+  const [period, setPeriod] = useState('30d')
+
+  const { data, isLoading, error } = useInsights({
+    pipeline: pipeline || undefined,
+    size: size || undefined,
+    period,
+  })
+
+  return (
+    <div className="h-full overflow-y-auto bg-gray-950 p-4 flex flex-col gap-4">
+      {/* Filter bar */}
+      <div className="flex items-center gap-2 flex-wrap">
+        <select
+          value={pipeline}
+          onChange={(e) => setPipeline(e.target.value)}
+          className="bg-gray-900 border border-gray-800 text-gray-300 text-xs rounded px-2 py-1.5 focus:outline-none focus:border-gray-600"
+        >
+          {PIPELINE_OPTIONS.map((opt) => (
+            <option key={opt.value} value={opt.value}>{opt.label}</option>
+          ))}
+        </select>
+
+        <select
+          value={size}
+          onChange={(e) => setSize(e.target.value)}
+          className="bg-gray-900 border border-gray-800 text-gray-300 text-xs rounded px-2 py-1.5 focus:outline-none focus:border-gray-600"
+        >
+          {SIZE_OPTIONS.map((opt) => (
+            <option key={opt.value} value={opt.value}>{opt.label}</option>
+          ))}
+        </select>
+
+        <div className="flex items-center gap-1 ml-auto">
+          {PERIOD_OPTIONS.map((opt) => (
+            <button
+              key={opt.value}
+              onClick={() => setPeriod(opt.value)}
+              className={`px-2.5 py-1 text-xs rounded transition-colors ${
+                period === opt.value
+                  ? 'bg-gray-700 text-white'
+                  : 'text-gray-500 hover:text-gray-300 hover:bg-gray-800/50'
+              }`}
+            >
+              {opt.label}
+            </button>
+          ))}
+        </div>
+      </div>
+
+      {/* Loading / error states */}
+      {isLoading && (
+        <div className="text-xs text-gray-500">Loading insights…</div>
+      )}
+      {error && (
+        <div className="text-xs text-red-400">Failed to load insights: {String(error)}</div>
+      )}
+
+      {/* Empty state */}
+      {data && data.total_runs === 0 && (
+        <div className="flex-1 flex items-center justify-center">
+          <p className="text-sm text-gray-500 text-center max-w-xs">
+            No pipeline runs recorded yet. Data starts collecting after your next tkt_done.
+          </p>
+        </div>
+      )}
+
+      {/* Content */}
+      {data && data.total_runs > 0 && (
+        <>
+          {/* Alerts */}
+          {data.alerts.length > 0 && (
+            <section>
+              <h2 className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">Alerts</h2>
+              <InsightAlerts alerts={data.alerts} />
+            </section>
+          )}
+
+          {/* Flow Efficiency */}
+          {data.flow_efficiency.length > 0 && (
+            <section>
+              <div className="flex items-center gap-2 mb-2">
+                <h2 className="text-xs font-semibold text-gray-500 uppercase tracking-wide">Flow Efficiency</h2>
+                <span className="text-xs text-gray-600">{data.total_runs} total runs · {data.period}</span>
+              </div>
+              <FlowEfficiencyCards items={data.flow_efficiency} />
+            </section>
+          )}
+
+          {/* Step Breakdown */}
+          {data.steps.length > 0 && (
+            <section>
+              <h2 className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-3">Step Breakdown</h2>
+              <div className="bg-gray-900 border border-gray-800 rounded-lg p-4">
+                <InsightsStrip steps={data.steps} />
+              </div>
+            </section>
+          )}
+        </>
+      )}
+    </div>
+  )
+}

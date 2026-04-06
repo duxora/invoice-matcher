@@ -3,6 +3,7 @@ import type { ReactNode } from 'react'
 import TaskBoard from './components/TaskBoard'
 import PipelinesPage from './pages/PipelinesPage'
 import SessionsPage from './pages/SessionsPage'
+import InsightsPage from './pages/InsightsPage'
 
 interface TabLinkProps {
   to: string
@@ -36,6 +37,7 @@ export default function WorkflowApp() {
         <TabLink to="/workflow" end>Tasks</TabLink>
         <TabLink to="/workflow/pipelines">Pipelines</TabLink>
         <TabLink to="/workflow/sessions">Sessions</TabLink>
+        <TabLink to="/workflow/insights">Insights</TabLink>
       </nav>
 
       {/* Sub-route content */}
@@ -44,6 +46,7 @@ export default function WorkflowApp() {
           <Route index element={<TaskBoard />} />
           <Route path="pipelines" element={<PipelinesPage />} />
           <Route path="sessions" element={<SessionsPage />} />
+          <Route path="insights" element={<InsightsPage />} />
         </Routes>
       </div>
     </div>
