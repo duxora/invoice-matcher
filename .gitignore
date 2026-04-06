@@ -11,3 +11,4 @@ build/
 credentials.json
 .credentials/
 .env
+.worktrees/
