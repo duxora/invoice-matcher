@@ -1,7 +1,8 @@
-import { useState, useMemo } from 'react'
+import { useMemo } from 'react'
 import useSWR from 'swr'
 import type { Session } from '../types'
 import { useSessions } from '../hooks/useSessions'
+import { useUrlParam } from '../hooks/useUrlParam'
 import { fetchJson } from '../lib/api'
 import { formatTimeAgo, formatElapsed } from '../lib/time'
 
@@ -156,7 +157,7 @@ function SessionRow({ session, expanded, onToggle }: SessionRowProps) {
 
 export default function SessionsPage() {
   const { sessions, error, isLoading } = useSessions()
-  const [expandedId, setExpandedId] = useState<string | null>(null)
+  const [expandedId, setExpandedId] = useUrlParam('session')
 
   // Sort: alive first, then by startedAt descending
   const sorted = useMemo(() => {
@@ -169,7 +170,7 @@ export default function SessionsPage() {
   const aliveCount = sessions.filter((s) => s.alive).length
 
   const handleToggle = (sessionId: string) => {
-    setExpandedId((prev) => (prev === sessionId ? null : sessionId))
+    setExpandedId(expandedId === sessionId ? '' : sessionId)
   }
 
   return (

@@ -1,7 +1,8 @@
-import { useState, useMemo } from 'react'
+import { useMemo, useCallback } from 'react'
 import type { DetailTarget, PipelineType } from '../types'
 import { usePipelineState } from '../hooks/usePipelineState'
 import { useNotifications } from '../hooks/useNotifications'
+import { useUrlParam } from '../hooks/useUrlParam'
 import PipelineList from '../components/PipelineList'
 import DetailPanel from '../components/DetailPanel'
 
@@ -17,9 +18,43 @@ export default function PipelinesPage() {
   const { pipelines, error, isLoading } = usePipelineState()
   useNotifications(pipelines)
 
-  const [projectFilter, setProjectFilter] = useState('')
-  const [typeFilter, setTypeFilter] = useState<PipelineType | ''>('')
-  const [selected, setSelected] = useState<DetailTarget | null>(null)
+  const [projectFilter, setProjectFilter] = useUrlParam('project')
+  const [typeFilterRaw, setTypeFilter]    = useUrlParam('type')
+  const typeFilter = typeFilterRaw as PipelineType | ''
+  const [detailKey, setDetailKey]         = useUrlParam('detail')
+
+  // Rehydrate the detail target from the URL once the pipelines list arrives.
+  // URL format: "pipeline:<task_id>" or "step:<task_id>:<stepName>".
+  // Session/task kinds aren't produced from PipelinesPage's flow, so we don't
+  // encode them here.
+  const selected = useMemo<DetailTarget | null>(() => {
+    if (!detailKey) return null
+    const [kind, idStr, ...rest] = detailKey.split(':')
+    const taskId = Number(idStr)
+    if (!Number.isFinite(taskId)) return null
+    const pipeline = pipelines.find((p) => p.task_id === taskId)
+    if (!pipeline) return null
+    if (kind === 'pipeline') return { kind: 'pipeline', pipeline }
+    if (kind === 'step' && rest.length > 0) {
+      return { kind: 'step', pipeline, stepName: rest.join(':') }
+    }
+    return null
+  }, [detailKey, pipelines])
+
+  const setSelected = useCallback(
+    (target: DetailTarget | null) => {
+      if (!target) { setDetailKey(''); return }
+      if (target.kind === 'pipeline') {
+        setDetailKey(`pipeline:${target.pipeline.task_id}`)
+      } else if (target.kind === 'step') {
+        setDetailKey(`step:${target.pipeline.task_id}:${target.stepName}`)
+      } else {
+        // session/task detail panels aren't triggered from this page
+        setDetailKey('')
+      }
+    },
+    [setDetailKey],
+  )
 
   // Derive unique project names from pipelines
   const projects = useMemo(() => {

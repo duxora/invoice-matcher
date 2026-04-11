@@ -1,5 +1,5 @@
-import { useState } from 'react'
 import { useInsights } from '../hooks/useInsights'
+import { useUrlParam } from '../hooks/useUrlParam'
 import FlowEfficiencyCards from '../components/FlowEfficiencyCards'
 import InsightsStrip from '../components/InsightsStrip'
 import InsightAlerts from '../components/InsightAlerts'
@@ -27,9 +27,9 @@ const PERIOD_OPTIONS = [
 ]
 
 export default function InsightsPage() {
-  const [pipeline, setPipeline] = useState('')
-  const [size, setSize] = useState('')
-  const [period, setPeriod] = useState('30d')
+  const [pipeline, setPipeline] = useUrlParam('pipeline')
+  const [size, setSize] = useUrlParam('size')
+  const [period, setPeriod] = useUrlParam('period', '30d')
 
   const { data, isLoading, error } = useInsights({
     pipeline: pipeline || undefined,

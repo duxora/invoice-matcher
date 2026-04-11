@@ -1,6 +1,7 @@
 import { useState, useMemo, useCallback } from 'react'
 import { useTaskBoard } from '../hooks/useTaskBoard'
 import { useSortCriteria } from '../hooks/useSortCriteria'
+import { useUrlParam } from '../hooks/useUrlParam'
 import { Status, Phases } from '../lib/tokens'
 import type { PhaseKey } from '../lib/tokens'
 import { applySorts } from '../lib/sort'
@@ -18,11 +19,17 @@ import { SearchIcon, CloseIcon, SettingsIcon, CheckTaskIcon, ExternalLinkIcon } 
 // ── main component ─────────────────────────────────────────────────────────
 
 export default function TaskBoard() {
-  const [projectFilter, setProjectFilter] = useState('')
-  const [statusFilter, setStatusFilter]   = useState('')
-  const [phaseFilter, setPhaseFilter]     = useState<PhaseKey | ''>('')
-  const [search, setSearch]               = useState('')
-  const [drawerTaskId, setDrawerTaskId]   = useState<number | null>(null)
+  const [projectFilter, setProjectFilter] = useUrlParam('project')
+  const [statusFilter, setStatusFilter]   = useUrlParam('status')
+  const [phaseFilterRaw, setPhaseFilter]  = useUrlParam('phase')
+  const phaseFilter = phaseFilterRaw as PhaseKey | ''
+  const [search, setSearch]               = useUrlParam('q')
+  const [drawerTaskRaw, setDrawerTaskRaw] = useUrlParam('task')
+  const drawerTaskId = drawerTaskRaw ? Number(drawerTaskRaw) : null
+  const setDrawerTaskId = useCallback(
+    (id: number | null) => setDrawerTaskRaw(id == null ? '' : String(id)),
+    [setDrawerTaskRaw],
+  )
   const [selectedTasks, setSelectedTasks] = useState<Set<number>>(new Set())
   const [domainMapOpen, setDomainMapOpen] = useState(false)
 
@@ -65,7 +72,8 @@ export default function TaskBoard() {
   const handleSelectTask = useCallback((id: number, checked: boolean) => {
     setSelectedTasks((prev) => {
       const next = new Set(prev)
-      checked ? next.add(id) : next.delete(id)
+      if (checked) next.add(id)
+      else next.delete(id)
       return next
     })
   }, [])
@@ -76,7 +84,10 @@ export default function TaskBoard() {
   const handleSelectAll = (checked: boolean) => {
     setSelectedTasks((prev) => {
       const next = new Set(prev)
-      for (const t of visibleTasks) checked ? next.add(t.id) : next.delete(t.id)
+      for (const t of visibleTasks) {
+        if (checked) next.add(t.id)
+        else next.delete(t.id)
+      }
       return next
     })
   }
@@ -149,7 +160,7 @@ export default function TaskBoard() {
             inProgress={p.in_progress_count}
             done={p.done_count}
             active={projectFilter === p.project_id}
-            onClick={() => setProjectFilter((prev) => prev === p.project_id ? '' : p.project_id)}
+            onClick={() => setProjectFilter(projectFilter === p.project_id ? '' : p.project_id)}
           />
         ))}
         {projectsError && (
@@ -166,7 +177,7 @@ export default function TaskBoard() {
             phase={phase}
             count={phaseCounts[phase.key] ?? 0}
             active={phaseFilter === phase.key}
-            onClick={() => setPhaseFilter((prev) => prev === phase.key ? '' : phase.key as PhaseKey)}
+            onClick={() => setPhaseFilter(phaseFilter === phase.key ? '' : (phase.key as PhaseKey))}
           />
         ))}
         {phaseFilter && (
@@ -292,7 +303,7 @@ export default function TaskBoard() {
               task={task}
               selected={selectedTasks.has(task.id)}
               onSelect={handleSelectTask}
-              onOpenDetail={(id) => setDrawerTaskId((prev) => (prev === id ? null : id))}
+              onOpenDetail={(id) => setDrawerTaskId(drawerTaskId === id ? null : id)}
               onDelete={handleDeleteTask}
             />
           ))}
