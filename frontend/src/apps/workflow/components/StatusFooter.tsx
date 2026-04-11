@@ -16,13 +16,13 @@ export default function StatusFooter({
     : 'SSE ○ disconnected'
 
   return (
-    <footer className="h-8 border-t border-gray-800 flex items-center gap-4 px-4 text-[10px] text-gray-500">
-      <span className={sseConnected ? 'text-emerald-600' : 'text-red-600'}>
+    <footer className="h-8 border-t border-gray-800 flex items-center gap-4 px-4 text-[11px] text-gray-300">
+      <span className={sseConnected ? 'text-emerald-400' : 'text-red-400'}>
         {sseLabel}
       </span>
       <span>
         {pipelineError ? (
-          <span className="text-red-600">Pipeline API error</span>
+          <span className="text-red-400">Pipeline API error</span>
         ) : (
           `${pipelineCount} active pipeline${pipelineCount !== 1 ? 's' : ''}`
         )}

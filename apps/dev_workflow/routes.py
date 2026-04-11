@@ -1182,6 +1182,24 @@ async def api_insights(
     )
 
 
+@router.delete("/api/tasks/{task_id}", response_class=JSONResponse)
+async def api_delete_task(task_id: int):
+    conn = get_tkt_db()
+    if not conn:
+        return JSONResponse({"error": "db not found"}, status_code=500)
+
+    task = conn.execute("SELECT id FROM tasks WHERE id = ?", [task_id]).fetchone()
+    if not task:
+        conn.close()
+        return JSONResponse({"error": "task not found"}, status_code=404)
+
+    conn.execute("DELETE FROM task_notes WHERE task_id = ?", [task_id])
+    conn.execute("DELETE FROM tasks WHERE id = ?", [task_id])
+    conn.commit()
+    conn.close()
+    return JSONResponse({"ok": True})
+
+
 # ── SPA catch-all for non-API routes ─────────────────────────────────────────
 # React Router handles /workflow, /workflow/pipelines, /workflow/sessions etc.
 

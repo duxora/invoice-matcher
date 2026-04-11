@@ -157,11 +157,49 @@ def _set_enabled(slug: str, enabled: bool):
                     return
     console.print(f"[red]Task with slug '{slug}' not found[/red]")
 
+def cmd_delete(args):
+    import re
+    cfg = get_config()
+    tasks_dir = cfg.paths.tasks_dir
+    for f in tasks_dir.glob("*.task"):
+        text = f.read_text()
+        name_match = re.search(r'^# name:\s+(.+)$', text, re.MULTILINE)
+        if name_match:
+            name = name_match.group(1).strip()
+            task_slug = name.lower().replace(" ", "-").strip("-")
+            if task_slug == args.task_slug:
+                if not args.force:
+                    confirm = input(f"Delete task '{name}' ({f})? [y/N] ").strip().lower()
+                    if confirm != "y":
+                        console.print("[dim]Cancelled.[/dim]")
+                        return
+                f.unlink()
+                console.print(f"[green]Deleted[/green]: {name} ({f.name})")
+                return
+    console.print(f"[red]Task with slug '{args.task_slug}' not found[/red]")
+
 def cmd_enable(args):
     _set_enabled(args.task_slug, True)
 
 def cmd_disable(args):
     _set_enabled(args.task_slug, False)
+
+
+# ── Install / Uninstall launchd agents ──
+
+def cmd_install(args):
+    import shutil
+    cfg = get_config()
+    cs_path = shutil.which("cs")
+    if not cs_path:
+        console.print("[red]cs not found in PATH[/red]")
+        return
+    from claude_scheduler.core.launchd import install
+    install(cfg.paths.tasks_dir, cfg.paths.logs_dir, cs_path, dry_run=args.dry_run)
+
+def cmd_uninstall(args):
+    from claude_scheduler.core.launchd import uninstall
+    uninstall()
 
 
 # ── Execution ──
@@ -744,6 +782,18 @@ def main():
     p = sub.add_parser("disable", help="Disable a task")
     p.add_argument("task_slug")
     p.set_defaults(func=cmd_disable)
+
+    p = sub.add_parser("delete", help="Delete a task")
+    p.add_argument("task_slug")
+    p.add_argument("--force", "-f", action="store_true", help="Skip confirmation")
+    p.set_defaults(func=cmd_delete)
+
+    p = sub.add_parser("install", help="Install launchd agents for all enabled tasks")
+    p.add_argument("--dry-run", action="store_true", help="Preview without installing")
+    p.set_defaults(func=cmd_install)
+
+    p = sub.add_parser("uninstall", help="Remove all launchd agents")
+    p.set_defaults(func=cmd_uninstall)
 
     # run
     p = sub.add_parser("run", help="Run a single task")

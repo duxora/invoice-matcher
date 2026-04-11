@@ -1,1 +1,108 @@
 @import "tailwindcss";
+
+/* ── Hub-wide theme tokens ─────────────────────────────────────────────── */
+/* --wf-*      : main content area                                          */
+/* --hub-*     : shell chrome (sidebar, top nav)                            */
+
+[data-workflow-theme="deep"] {
+  --wf-bg-base:      #0d1117;
+  --wf-bg-surface:   #161b22;
+  --wf-bg-card:      #21262d;
+  --wf-bg-hover:     #1c2128;
+  --wf-border:       #30363d;
+  --wf-border-sub:   #21262d;
+
+  --hub-sidebar-bg:  #0d1117;
+  --hub-sidebar-bdr: #21262d;
+  --hub-shell-bg:    #010409;
+  --hub-nav-bg:      #0d1117;
+  --hub-nav-bdr:     #21262d;
+  --hub-active-bg:   #21262d;
+  --hub-text:        #8b949e;
+  --hub-text-active: #f0f6fc;
+  --hub-hover-bg:    #161b22;
+}
+
+[data-workflow-theme="warm"] {
+  --wf-bg-base:      #09090b;
+  --wf-bg-surface:   #18181b;
+  --wf-bg-card:      #27272a;
+  --wf-bg-hover:     #2d2d30;
+  --wf-border:       #3f3f46;
+  --wf-border-sub:   #27272a;
+
+  --hub-sidebar-bg:  #111113;
+  --hub-sidebar-bdr: #27272a;
+  --hub-shell-bg:    #09090b;
+  --hub-nav-bg:      #111113;
+  --hub-nav-bdr:     #27272a;
+  --hub-active-bg:   #27272a;
+  --hub-text:        #a1a1aa;
+  --hub-text-active: #fafafa;
+  --hub-hover-bg:    #18181b;
+}
+
+[data-workflow-theme="slack"] {
+  --wf-bg-base:      #1a1d21;
+  --wf-bg-surface:   #222529;
+  --wf-bg-card:      #2c2d30;
+  --wf-bg-hover:     #27292c;
+  --wf-border:       #424649;
+  --wf-border-sub:   #363940;
+
+  --hub-sidebar-bg:  #19171d;
+  --hub-sidebar-bdr: #2d2b30;
+  --hub-shell-bg:    #1a1d21;
+  --hub-nav-bg:      #222529;
+  --hub-nav-bdr:     #363940;
+  --hub-active-bg:   #2d2b30;
+  --hub-text:        #9b9c9e;
+  --hub-text-active: #d1d2d3;
+  --hub-hover-bg:    #27292c;
+}
+
+[data-workflow-theme="railway"] {
+  --wf-bg-base:      #0b0d0f;
+  --wf-bg-surface:   #131619;
+  --wf-bg-card:      #1a1d21;
+  --wf-bg-hover:     #1e2228;
+  --wf-border:       #23272b;
+  --wf-border-sub:   #1a1d21;
+
+  --hub-sidebar-bg:  #0f1115;
+  --hub-sidebar-bdr: #1e2228;
+  --hub-shell-bg:    #0b0d0f;
+  --hub-nav-bg:      #0f1115;
+  --hub-nav-bdr:     #1e2228;
+  --hub-active-bg:   #1e2228;
+  --hub-text:        #8a909a;
+  --hub-text-active: #ffffff;
+  --hub-hover-bg:    #161a1f;
+}
+
+/* ── Vision theme — lighter mid-dark, more breathing room ─────────────── */
+[data-workflow-theme="vision"] {
+  --wf-bg-base:      #111827;   /* slate-900 */
+  --wf-bg-surface:   #1e293b;   /* slate-800 */
+  --wf-bg-card:      #253044;   /* slate-750 */
+  --wf-bg-hover:     #2a3855;   /* slate-700 tinted */
+  --wf-border:       #374151;   /* slate-700 */
+  --wf-border-sub:   #2d3e54;
+
+  --hub-sidebar-bg:  #0f1623;
+  --hub-sidebar-bdr: #1e293b;
+  --hub-shell-bg:    #0a1020;
+  --hub-nav-bg:      #111827;
+  --hub-nav-bdr:     #1e293b;
+  --hub-active-bg:   #253044;
+  --hub-text:        #94a3b8;   /* slate-400 */
+  --hub-text-active: #f1f5f9;   /* slate-100 */
+  --hub-hover-bg:    #1e293b;
+}
+
+/* Railway dot-grid canvas background */
+[data-workflow-theme="railway"] .wf-main-canvas {
+  background-image:
+    radial-gradient(circle, rgba(255,255,255,0.06) 1px, transparent 1px);
+  background-size: 22px 22px;
+}

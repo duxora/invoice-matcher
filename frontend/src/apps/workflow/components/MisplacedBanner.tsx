@@ -46,7 +46,7 @@ export default function MisplacedBanner({ projectFilter }: MisplacedBannerProps)
         <span className="text-xs text-amber-300 flex-1">
           {misplaced.length} task{misplaced.length !== 1 ? 's' : ''} may be in the wrong project
         </span>
-        <span className="text-[10px] text-amber-600 shrink-0">
+        <span className="text-[11px] text-amber-400 shrink-0">
           {expanded ? '▲' : '▼'}
         </span>
       </button>
@@ -56,11 +56,11 @@ export default function MisplacedBanner({ projectFilter }: MisplacedBannerProps)
         <div className="border-t border-amber-800/50 px-3 pb-2 pt-1.5 flex flex-col gap-1">
           {misplaced.map((task) => (
             <div key={task.id} className="flex items-center gap-2 text-xs">
-              <span className="text-gray-600 shrink-0">#{task.id}</span>
-              <span className="text-gray-300 truncate flex-1 min-w-0">{task.title}</span>
-              <span className="text-amber-600 shrink-0 whitespace-nowrap">
+              <span className="text-gray-400 shrink-0">#{task.id}</span>
+              <span className="text-gray-200 truncate flex-1 min-w-0">{task.title}</span>
+              <span className="text-amber-400 shrink-0 whitespace-nowrap">
                 {task.current_project}
-                <span className="text-amber-800 mx-1">→</span>
+                <span className="text-amber-600 mx-1">→</span>
                 {task.suggested_project}
               </span>
             </div>

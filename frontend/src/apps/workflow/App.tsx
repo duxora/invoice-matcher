@@ -4,6 +4,7 @@ import TaskBoard from './components/TaskBoard'
 import PipelinesPage from './pages/PipelinesPage'
 import SessionsPage from './pages/SessionsPage'
 import InsightsPage from './pages/InsightsPage'
+import { useThemeContext } from '../../shared/ThemeContext'
 
 interface TabLinkProps {
   to: string
@@ -19,10 +20,14 @@ function TabLink({ to, end, children }: TabLinkProps) {
       className={({ isActive }) =>
         `px-3 py-1.5 text-xs font-medium rounded transition-colors ${
           isActive
-            ? 'bg-gray-800 text-white'
-            : 'text-gray-500 hover:text-gray-300 hover:bg-gray-800/50'
+            ? 'text-white'
+            : 'hover:text-gray-300'
         }`
       }
+      style={({ isActive }) => ({
+        background: isActive ? 'var(--hub-active-bg)' : undefined,
+        color: isActive ? 'var(--hub-text-active)' : 'var(--hub-text)',
+      })}
     >
       {children}
     </NavLink>
@@ -30,10 +35,15 @@ function TabLink({ to, end, children }: TabLinkProps) {
 }
 
 export default function WorkflowApp() {
+  useThemeContext()
+
   return (
     <div className="flex flex-col h-full">
       {/* Sub-nav tabs */}
-      <nav className="flex items-center gap-1 px-4 py-1.5 border-b border-gray-800 shrink-0 bg-gray-950">
+      <nav
+        className="flex items-center gap-1 px-4 py-1.5 border-b shrink-0"
+        style={{ background: 'var(--hub-nav-bg)', borderColor: 'var(--hub-nav-bdr)' }}
+      >
         <TabLink to="/workflow" end>Tasks</TabLink>
         <TabLink to="/workflow/pipelines">Pipelines</TabLink>
         <TabLink to="/workflow/sessions">Sessions</TabLink>

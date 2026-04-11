@@ -44,6 +44,8 @@
       <option value="system-design">system-design</option>
       <option value="leadership">leadership</option>
       <option value="startup">startup</option>
+      <option value="agentic-ai">agentic-ai</option>
+      <option value="vibe-coding">vibe-coding</option>
     </select>
   </div>
   <div id="search-results" class="mt-4"></div>
@@ -87,7 +89,7 @@
     </div>
     <div class="p-4">
       <div class="flex flex-wrap gap-2 mb-4">
-        {% set domains = ['tech-trends', 'coding-skills', 'system-design', 'leadership', 'startup'] %}
+        {% set domains = ['tech-trends', 'coding-skills', 'system-design', 'leadership', 'startup', 'agentic-ai', 'vibe-coding'] %}
         {% for d in domains %}
         <button class="btn btn-ghost text-xs domain-btn"
                 hx-get="/kb/partials/browse?domain={{ d }}"
@@ -135,6 +137,8 @@
           <option value="system-design">system-design</option>
           <option value="leadership">leadership</option>
           <option value="startup">startup</option>
+          <option value="agentic-ai">agentic-ai</option>
+          <option value="vibe-coding">vibe-coding</option>
         </select>
       </div>
       <div id="ingest-result" class="mb-3 text-sm"></div>

@@ -96,6 +96,21 @@ export default function BulkActions({ selectedIds, projects, onClearSelection }:
     }
   }
 
+  async function handleDeleteSelected() {
+    if (!confirm(`Delete ${count} task${count !== 1 ? 's' : ''}? This cannot be undone.`)) return
+    setLoading(true)
+    setError(null)
+    try {
+      await Promise.all(ids.map((id) => fetch(`/workflow/api/tasks/${id}`, { method: 'DELETE' })))
+      await mutate((key: string) => typeof key === 'string' && key.startsWith('/workflow/api/tasks'))
+      onClearSelection()
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Delete failed')
+    } finally {
+      setLoading(false)
+    }
+  }
+
   return (
     <div className="fixed bottom-0 left-0 right-0 z-40 bg-gray-900 border-t border-gray-700 px-4 py-2.5 flex items-center gap-3 flex-wrap shadow-lg">
       {/* Count */}
@@ -188,11 +203,22 @@ export default function BulkActions({ selectedIds, projects, onClearSelection }:
         <span className="text-[10px] text-red-400 ml-1">{error}</span>
       )}
 
+      <div className="w-px h-4 bg-gray-700 shrink-0" />
+
+      {/* Delete selected */}
+      <button
+        onClick={handleDeleteSelected}
+        disabled={loading}
+        className="text-xs px-2.5 py-1 bg-red-900/40 border border-red-700/60 rounded text-red-300 hover:bg-red-900/70 hover:border-red-600 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+      >
+        Delete {count}
+      </button>
+
       <div className="ml-auto">
         <button
           onClick={onClearSelection}
           disabled={loading}
-          className="text-xs text-gray-500 hover:text-gray-300 transition-colors disabled:opacity-50"
+          className="text-xs text-gray-300 hover:text-white transition-colors disabled:opacity-50"
         >
           Clear selection
         </button>

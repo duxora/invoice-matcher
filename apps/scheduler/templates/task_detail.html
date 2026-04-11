@@ -21,6 +21,13 @@
       <button class="px-4 py-1.5 text-sm rounded bg-green-600 hover:bg-green-700 text-white transition-colors">Enable</button>
       {% endif %}
     </form>
+    <button hx-post="/scheduler/api/delete/{{ task.slug }}"
+            hx-confirm="Delete '{{ task.name }}' permanently?"
+            hx-swap="none"
+            hx-on::after-request="window.location='/scheduler/'"
+            class="px-4 py-1.5 text-sm rounded bg-red-600 hover:bg-red-700 text-white transition-colors">
+      Delete
+    </button>
   </div>
 </div>
 
@@ -40,7 +47,7 @@
       </div>
       <div class="flex justify-between">
         <dt class="text-hub-muted">Tools</dt>
-        <dd>{{ task.tools | join(', ') if task.tools else '-' }}</dd>
+        <dd>{{ task.tools if task.tools else '-' }}</dd>
       </div>
       <div class="flex justify-between">
         <dt class="text-hub-muted">Max Turns</dt>

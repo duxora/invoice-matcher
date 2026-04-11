@@ -175,16 +175,16 @@ export default function DashboardPage() {
   const [showIngestModal, setShowIngestModal] = useState(false)
   const [browseDomain, setBrowseDomain] = useState<string>('')
 
-  // Trending: last 7 days, use search with empty q to get recent entries from specific domain
+  // Trending: last 7 days
   const { data: trending } = useSWR<KBEntry[]>(
-    '/kb/api/search?q=.&domain=',
+    '/kb/api/trending?days=7&limit=5',
     fetcher,
     { refreshInterval: 30_000 },
   )
 
   // Recent entries
   const { data: recentEntries } = useSWR<KBEntry[]>(
-    '/kb/api/search?q=.&domain=',
+    '/kb/api/recent?limit=10',
     fetcher,
     { refreshInterval: 30_000 },
   )
@@ -211,7 +211,7 @@ export default function DashboardPage() {
       </div>
 
       {/* Stats grid */}
-      <div className="grid grid-cols-2 md:grid-cols-6 gap-3 mb-6">
+      <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-8 gap-3 mb-6">
         <div className="bg-gray-800/50 border border-gray-700 rounded-lg p-4 md:col-span-1">
           <div className="text-gray-500 text-xs uppercase tracking-wide mb-1">Total Entries</div>
           <div className="text-2xl font-bold">

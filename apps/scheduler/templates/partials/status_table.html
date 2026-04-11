@@ -47,6 +47,13 @@
                     hx-on::after-request="location.reload()">
               {% if task.enabled %}Disable{% else %}Enable{% endif %}
             </button>
+            <button class="btn btn-ghost text-xs text-red-400"
+                    hx-post="/scheduler/api/delete/{{ task.slug }}"
+                    hx-confirm="Delete '{{ task.name }}' permanently?"
+                    hx-swap="none"
+                    hx-on::after-request="location.reload()">
+              Delete
+            </button>
           </td>
         </tr>
       {% endfor %}

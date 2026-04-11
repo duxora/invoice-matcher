@@ -4,6 +4,8 @@ export type KBDomain =
   | 'system-design'
   | 'leadership'
   | 'startup'
+  | 'agentic-ai'
+  | 'vibe-coding'
 
 export type KBConfidence = 'high' | 'medium' | 'low'
 

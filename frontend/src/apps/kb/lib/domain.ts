@@ -6,6 +6,8 @@ export const KB_DOMAINS: KBDomain[] = [
   'system-design',
   'leadership',
   'startup',
+  'agentic-ai',
+  'vibe-coding',
 ]
 
 // Color-coded domain badges
@@ -15,6 +17,8 @@ const DOMAIN_COLORS: Record<KBDomain, string> = {
   'system-design': 'bg-purple-900/60 text-purple-300 border-purple-700',
   'leadership': 'bg-amber-900/60 text-amber-300 border-amber-700',
   'startup': 'bg-pink-900/60 text-pink-300 border-pink-700',
+  'agentic-ai': 'bg-cyan-900/60 text-cyan-300 border-cyan-700',
+  'vibe-coding': 'bg-violet-900/60 text-violet-300 border-violet-700',
 }
 
 export function domainBadgeClass(domain: string): string {

@@ -1,5 +1,7 @@
 import { useEffect } from 'react'
 import useSWR from 'swr'
+import { PriorityBadge, StatusBadge } from './ui/Badge'
+import { TrashIcon } from './ui/icons'
 
 // ── types ──────────────────────────────────────────────────────────────────
 
@@ -45,21 +47,6 @@ interface TaskDetailResponse {
   docs: Doc[]
 }
 
-// ── constants ──────────────────────────────────────────────────────────────
-
-const PRIORITY_BADGE: Record<string, string> = {
-  critical: 'bg-red-950 text-red-400 border border-red-800',
-  high: 'bg-orange-950 text-orange-400 border border-orange-800',
-  medium: 'bg-yellow-950 text-yellow-400 border border-yellow-800',
-  low: 'bg-gray-800 text-gray-500 border border-gray-700',
-}
-
-const STATUS_BADGE: Record<string, string> = {
-  open: 'bg-blue-950 text-blue-400 border border-blue-800',
-  in_progress: 'bg-amber-950 text-amber-400 border border-amber-800',
-  backlog: 'bg-indigo-950 text-indigo-400 border border-indigo-800',
-  done: 'bg-green-950 text-green-400 border border-green-800',
-}
 
 // ── fetcher ────────────────────────────────────────────────────────────────
 
@@ -94,9 +81,10 @@ function Field({ label, children }: { label: string; children: React.ReactNode }
 interface TaskDetailDrawerProps {
   taskId: number | null
   onClose: () => void
+  onDelete?: (id: number) => Promise<void>
 }
 
-export default function TaskDetailDrawer({ taskId, onClose }: TaskDetailDrawerProps) {
+export default function TaskDetailDrawer({ taskId, onClose, onDelete }: TaskDetailDrawerProps) {
   const { data, error } = useSWR<TaskDetailResponse>(
     taskId != null ? `/workflow/api/tasks/${taskId}/detail` : null,
     fetcher,
@@ -124,13 +112,14 @@ export default function TaskDetailDrawer({ taskId, onClose }: TaskDetailDrawerPr
 
       {/* Drawer panel */}
       <div
-        className="fixed top-0 right-0 z-30 h-full w-full sm:w-[400px] bg-gray-900 border-l border-gray-700 flex flex-col shadow-2xl"
+        className="fixed top-0 right-0 z-30 h-full w-full sm:w-[400px] flex flex-col shadow-2xl border-l"
+        style={{ background: 'var(--wf-bg-surface)', borderColor: 'var(--wf-border)' }}
         role="dialog"
         aria-modal="true"
         aria-label="Task detail"
       >
         {/* Header */}
-        <div className="flex items-center justify-between px-4 py-3 border-b border-gray-700 shrink-0">
+        <div className="flex items-center justify-between px-4 py-3 shrink-0 border-b" style={{ borderColor: 'var(--wf-border)' }}>
           {data ? (
             <div className="flex-1 min-w-0 mr-2">
               <p className="text-[10px] text-gray-500 mb-0.5">#{data.task.id}</p>
@@ -139,13 +128,30 @@ export default function TaskDetailDrawer({ taskId, onClose }: TaskDetailDrawerPr
           ) : (
             <p className="text-xs text-gray-500">{error ? 'Error loading task' : 'Loading...'}</p>
           )}
-          <button
-            onClick={onClose}
-            className="shrink-0 text-gray-500 hover:text-gray-300 transition-colors w-6 h-6 flex items-center justify-center rounded hover:bg-gray-800"
-            aria-label="Close drawer"
-          >
-            ✕
-          </button>
+          <div className="flex items-center gap-1 shrink-0">
+            {data && onDelete && (
+              <button
+                onClick={async () => {
+                  if (confirm(`Delete task #${data.task.id}?\n"${data.task.title}"\n\nThis cannot be undone.`)) {
+                    await onDelete(data.task.id)
+                    onClose()
+                  }
+                }}
+                className="text-gray-600 hover:text-red-400 transition-colors w-6 h-6 flex items-center justify-center rounded hover:bg-gray-800"
+                aria-label="Delete task"
+                title="Delete task"
+              >
+                <TrashIcon />
+              </button>
+            )}
+            <button
+              onClick={onClose}
+              className="text-gray-500 hover:text-gray-300 transition-colors w-6 h-6 flex items-center justify-center rounded hover:bg-gray-800"
+              aria-label="Close drawer"
+            >
+              ✕
+            </button>
+          </div>
         </div>
 
         {/* Body */}
@@ -160,12 +166,8 @@ export default function TaskDetailDrawer({ taskId, onClose }: TaskDetailDrawerPr
             <div className="flex flex-col gap-5">
               {/* Badges */}
               <div className="flex flex-wrap gap-1.5">
-                <span className={`text-[10px] px-1.5 py-0.5 rounded ${PRIORITY_BADGE[data.task.priority] ?? 'bg-gray-800 text-gray-500'}`}>
-                  {data.task.priority}
-                </span>
-                <span className={`text-[10px] px-1.5 py-0.5 rounded ${STATUS_BADGE[data.task.status] ?? 'bg-gray-800 text-gray-400'}`}>
-                  {data.task.status.replace('_', ' ')}
-                </span>
+                <PriorityBadge priority={data.task.priority} />
+                <StatusBadge status={data.task.status} />
                 {data.task.domain && (
                   <span className="text-[10px] px-1.5 py-0.5 rounded bg-gray-800 text-gray-400 border border-gray-700">
                     {data.task.domain}
@@ -256,7 +258,7 @@ export default function TaskDetailDrawer({ taskId, onClose }: TaskDetailDrawerPr
                   <p className="text-[10px] text-gray-500 uppercase tracking-wider mb-2">Notes</p>
                   <div className="flex flex-col gap-2">
                     {data.notes.map((note, i) => (
-                      <div key={i} className="bg-gray-800 rounded-lg px-3 py-2 border border-gray-700">
+                      <div key={i} className="rounded-lg px-3 py-2 border" style={{ background: 'var(--wf-bg-card)', borderColor: 'var(--wf-border)' }}>
                         <p className="text-xs text-gray-300 leading-relaxed">{note.content}</p>
                         <p className="text-[10px] text-gray-600 mt-1">
                           {note.added_by} · {formatDate(note.created_at)}

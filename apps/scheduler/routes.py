@@ -1,19 +1,16 @@
 """Scheduler web routes — dashboard, history, errors, tickets, and task management."""
 import shutil
 import subprocess
-import sys
 from pathlib import Path
 
 from fastapi import APIRouter, Form, Query, Request
 from fastapi.responses import HTMLResponse, RedirectResponse
 from fastapi.templating import Jinja2Templates
 
-from server.config import SCHEDULER_DIR, TASKS_DIR, LOGS_DIR, DATA_DIR
+from server.config import TASKS_DIR, LOGS_DIR, DATA_DIR
 
-# Make scheduler package importable
-sys.path.insert(0, str(SCHEDULER_DIR))
-from scheduler.db import Database
-from scheduler.parser import find_tasks, parse_task
+from claude_scheduler.core.db import Database
+from claude_scheduler.core.parser import find_tasks, parse_task
 
 router = APIRouter()
 SERVER_TEMPLATES = Path(__file__).parent.parent.parent / "server" / "templates"
@@ -297,7 +294,7 @@ async def run_task(slug: str):
 
     db = get_db()
     try:
-        from scheduler.orchestrator import Orchestrator
+        from claude_scheduler.core.orchestrator import Orchestrator
         orch = Orchestrator(tasks_dir=TASKS_DIR, logs_dir=LOGS_DIR, db=db)
         orch.run_single(task)
         state = db.get_task_state(task.name)
@@ -357,6 +354,15 @@ async def mark_notifications_read():
     finally:
         db.close()
     return RedirectResponse(url="/scheduler/notifications", status_code=303)
+
+
+@router.post("/api/delete/{slug}")
+async def delete_task(slug: str):
+    task, err = _find_task_by_slug(slug)
+    if err:
+        return RedirectResponse(url="/scheduler/", status_code=303)
+    task.file_path.unlink()
+    return RedirectResponse(url="/scheduler/", status_code=303)
 
 
 @router.post("/tasks-new")
@@ -552,10 +558,10 @@ def _run_to_dict(run):
         "task_name": run.task_name,
         "status": run.status,
         "started_at": run.started_at,
-        "finished_at": run.finished_at,
+        "finished_at": run.completed_at,
         "duration_seconds": run.duration_seconds,
         "cost_usd": run.cost_usd,
-        "error": run.error,
+        "error": run.error_message,
     }
 
 
@@ -584,7 +590,7 @@ async def api_task_detail_json(slug: str):
         return JSONResponse({
             "task": _task_to_dict(task, state),
             "runs": [_run_to_dict(r) for r in runs],
-            "errors": [{"message": e.message, "timestamp": e.timestamp, "task_name": e.task_name} for e in errs],
+            "errors": [{"message": e.error_message, "timestamp": e.occurred_at, "task_name": e.task_name} for e in errs],
         })
     finally:
         db.close()
@@ -626,7 +632,7 @@ async def api_errors_json(task: str = Query(default=None)):
     try:
         errs = db.get_errors(task_name=task)
         return JSONResponse([
-            {"message": e.message, "timestamp": e.timestamp, "task_name": e.task_name}
+            {"message": e.error_message, "timestamp": e.occurred_at, "task_name": e.task_name}
             for e in errs
         ])
     finally:

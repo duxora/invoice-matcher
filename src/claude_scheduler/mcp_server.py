@@ -330,6 +330,17 @@ def scheduler_create_task(
 
 
 @mcp.tool()
+def scheduler_delete_task(slug: str) -> str:
+    """Delete a scheduled task by its slug. Removes the .task file permanently."""
+    task, err = _find_task_by_slug(slug)
+    if err:
+        return err
+
+    task.file_path.unlink()
+    return f"Deleted task '{task.name}' ({task.file_path.name})"
+
+
+@mcp.tool()
 def scheduler_resolve_ticket(ticket_id: int, resolution: str = "") -> str:
     """Resolve a remediation ticket by ID."""
     db = _get_db()

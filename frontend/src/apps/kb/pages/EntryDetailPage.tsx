@@ -13,17 +13,10 @@ export default function EntryDetailPage() {
   const [isDeleting, setIsDeleting] = useState(false)
   const [deleteError, setDeleteError] = useState<string | null>(null)
 
-  // Use the search endpoint to fetch a single entry by id — the backend
-  // doesn't expose a single-entry JSON API, but we can search by id prefix.
-  // Alternatively we use the /api/search endpoint. Since the backend has no
-  // /api/entry/:id endpoint, we fetch all and filter client-side.
-  // This is acceptable for the current scale (< 1000 entries).
-  const { data: entries, error, isLoading } = useSWR<KBEntry[]>(
-    '/kb/api/search?q=.',
+  const { data: entry, error, isLoading } = useSWR<KBEntry>(
+    id ? `/kb/api/entry/${encodeURIComponent(id)}` : null,
     fetcher,
   )
-
-  const entry = entries?.find((e) => e.id === id)
 
   async function handleDelete() {
     if (!id) return
@@ -49,7 +42,7 @@ export default function EntryDetailPage() {
     )
   }
 
-  if (error || (!isLoading && !entry)) {
+  if (error || (!isLoading && !entry?.id)) {
     return (
       <div className="flex flex-col items-center justify-center h-64 bg-gray-950 text-gray-400 gap-4">
         <p className="text-sm">{error ? 'Failed to load entry.' : 'Entry not found.'}</p>
@@ -60,7 +53,7 @@ export default function EntryDetailPage() {
     )
   }
 
-  if (!entry) return null
+  if (!entry) return null // satisfies TypeScript narrowing
 
   return (
     <div className="bg-gray-950 text-gray-100 p-4 overflow-y-auto min-h-full">
